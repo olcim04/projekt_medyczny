@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/home.css' %}">
+    <title>Document</title>
+</head>
+<body onload="Statystyka(); Wyb(); aktualizujWynikiWidocznosc(); loadPendingTestResults()">
+    <div id="top" style="position: relative; top: 5px;">
+        <h1 id="title" style="color: #222222;">
+            STRONA KLINICYSTY <br><br>
+        </h1>
+        <button class="btn-small" onclick="wyloguj()" id="log_out_btn" style="position: absolute; top: 0px; right: 10px; font-size: small;">WYLOGUJ</button>
+    </div>
+    {% if messages %}
+    <div id="messages" style="padding: 10px; margin: 10px 0; border-radius: 6px; background: #f8f8f8; border: 1px solid #ddd;">
+        {% for message in messages %}
+            <div style="color: {% if message.tags == 'error' %}#c00{% elif message.tags == 'success' %}#080{% else %}#333{% endif %};">
+                {{ message }}
+            </div>
+        {% endfor %}
+    </div>
+    {% endif %}    <div id="main2">
+        {% csrf_token %}
+        <div id="klinicysta">
+            Klinicysta prowadzący: {{ user.first_name }} {{ user.last_name }}<br><br>
+        </div>
+        <div id="gen">
+            <div id="pacjent">
+                <div id="choice">
+                    <label for="wyb">Wybierz pacjenta</label>
+                        <input type="radio" id="wyb" name="wyb" value="old" checked="true" onchange="Wyb()">
+                    <label for="dod">Dodaj pacjenta</label>
+                        <input type="radio" id="dod" name="wyb" value="new" onchange="Wyb()">
+                </div>
+                <div id="old">
+                    <div id="iin">
+                       <br><label for="iin">Imię i nazwisko pacjenta:</label>
+                        <select name="iin" id="iinlist" onchange="wybierzPacjenta()">
+                            <option value="0">Wybierz pacjenta</option>
+                            {% for pacjent in pacjenci %}
+                            <option value="{{ pacjent.id_pacjenta }}"{% if wybrany_pacjent and pacjent.id_pacjenta == wybrany_pacjent.id_pacjenta %} selected{% endif %}>{{ pacjent.imie }} {{ pacjent.nazwisko }}</option>
+                            {% endfor %}
+                        </select> <br><br>
+                    </div>
+                    <div id="info_data_urodzenia">Data urodzenia: {% if wybrany_pacjent %}{{ wybrany_pacjent.data_urodzenia|date:'Y-m-d' }}{% else %}-{% endif %}</div><br>
+                    <div id="info_plec">Płeć: {% if wybrany_pacjent %}{{ wybrany_pacjent.get_plec_display }}{% else %}-{% endif %}</div><br>
+                    <div id="info_nazwa">Nazwa dokumentu: {% if wybrany_pacjent %}{{ wybrany_pacjent.nazwa_dokumentu }}{% else %}-{% endif %}</div><br>
+                    <div id="info_numer_dokumentu">Numer dokumentu: {% if wybrany_pacjent %}{{ wybrany_pacjent.numer_dokumentu }}{% else %}-{% endif %}</div><br>
+                    <div id="info_wiek">Wiek: {% if wybrany_pacjent %}{{ wybrany_pacjent.data_urodzenia|date:'Y' }}{% else %}-{% endif %}</div><br>
+                    <button class="btn-small" onclick="edytujPacjenta()" id="edytuj_btn">EDYTUJ</button>
+                </div>
+                <div id="new">
+                    <input type="hidden" id="edit_pacjent_id" value="0">
+                    <div id="imie">
+                        <br><label for="imie_input">Imię:</label>
+                        <input type="text" id="imie_input" name="imie"><br><br>
+                    </div>
+                    <div id="nazwisko">
+                        <label for="nazwisko_input">Nazwisko:</label>
+                        <input type="text" id="nazwisko_input" name="nazwisko"><br><br>
+                    </div>
+                    <div id="data_urodzenia">
+                        <label for="data_urodzenia_input">Data urodzenia:</label>
+                        <input type="date" id="data_urodzenia_input" name="data_urodzenia"><br><br>
+                    </div>
+                    <div id="plec_select">
+                        <label for="plec_input">Płeć:</label>
+                        <select id="plec_input" name="plec">
+                            <option value="M">Mężczyzna</option>
+                            <option value="K">Kobieta</option>
+                            <option value="Inna">Inna</option>
+                        </select><br><br>
+                    </div>
+                    <div id="nazwa_dokumentu_input">
+                        <label for="nazwa_dokumentu_field">Nazwa dokumentu:</label>
+                        <input type="text" id="nazwa_dokumentu_field" name="nazwa_dokumentu"><br><br>
+                    </div>
+                    <div id="numer_dokumentu_input">
+                        <label for="numer_dokumentu_field">Numer dokumentu:</label>
+                        <input type="text" id="numer_dokumentu_field" name="numer_dokumentu"><br><br>
+                    </div>
+                    <button class="btn-small" onclick="zapisz()" id="zapisz_pacjenta_btn">ZAPISZ</button>
+                </div>
+            </div>
+            <div id="wyniki">
+                <div><br><label for="testyy">Badanie:</label>
+                <select name="testyy" id="testyy" onchange="aktualizujWynikiWidocznosc(); if (document.getElementById('iinlist').value !== '0') wybierzPacjenta();">
+                <option value="0">Wybierz badanie</option>
+                <option value="{% url 'test' %}">Test kolorów</option>
+                </select> <br><br>
+                <button class="btn-small" onclick="rozpocznijTest()" id="start_btn">START</button>
+                <button class="btn-small" onclick="exportWyniki()" id="export_btn" style="margin-left: 10px;">EKSPORTUJ</button>
+                </div>
+                <div id="wyniki_dane" style="display:none; margin-top: 20px;">
+                    <div id="test_kolorow"></div>
+                    <div id="pending_results_message" style="display:none; margin-bottom: 10px; font-weight: bold; color: #333;"></div>
+                    <div id="red">Czerwony: {% if wyniki %}{{ wyniki.wynik_r|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
+                    <div id="green">Zielony: {% if wyniki %}{{ wyniki.wynik_g|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
+                    <div id="blue">Niebieski: {% if wyniki %}{{ wyniki.wynik_b|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
+                    <div id="average">Średnia całkowita: {% if wyniki %}{{ wyniki.wynik_ogolny|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
+                    <div id="time">Czas badania: {% if wyniki %}{{ wyniki.czas_trwania|default:'00:00:00' }}{% else %}Brak wyników{% endif %}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="bot">
+        <div>
+            <button class="btn-small" onclick="zapiszWyniki()" id="zapisz_wyniki_btn" style="display: none;">ZAPISZ</button>
+            <button class="btn-small" onclick="skipWyniki()" id="skip_wyniki_btn" style="display: none; margin-left: 10px;">POMIŃ</button>
+        </div>
+    </div>
+    <div id="idleModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+        <div style="background:white;padding:20px;border-radius:8px;text-align:center;max-width:400px;">
+            <p>Brak aktywności przez 15 minut. Nadal jesteś na stronie?</p>
+            <button id="btnStay" style="margin-right:10px;">Tak</button>
+            <button id="btnLogout">Nie</button>
+            <p id="idleCountdown" style="margin-top:10px;color:#c00;"></p>
+        </div>
+    </div>
+</body>
+
+<script>
+let idleTimer;
+let logoutTimer;
+const INACTIVITY_MS = 15 * 60 * 1000; // 15 minut
+const CONFIRM_MS = 5 * 60 * 1000; // 5 minut
+
+function resetIdleTimer() {
+    document.getElementById('idleModal').style.display = 'none';
+    clearTimeout(idleTimer);
+    clearTimeout(logoutTimer);
+    idleTimer = setTimeout(showIdlePrompt, INACTIVITY_MS);
+}
+
+function showIdlePrompt() {
+    let remaining = CONFIRM_MS / 1000;
+    const countdown = document.getElementById('idleCountdown');
+    const modal = document.getElementById('idleModal');
+    modal.style.display = 'flex';
+    countdown.textContent = `Wylogowanie za: ${remaining} s`;
+
+    // Zablokuj wszystkie zdarzenia poza modalem, aby przyciski w modalu działały
+    const blockEventDuringModal = (e) => {
+        if (modal.style.display === 'flex' && !modal.contains(e.target)) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+    };
+
+    ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(event => {
+        document.addEventListener(event, blockEventDuringModal, true);
+    });
+
+    const cleanupModalBlockers = () => {
+        ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(event => {
+            document.removeEventListener(event, blockEventDuringModal, true);
+        });
+    };
+
+    logoutTimer = setInterval(() => {
+        remaining -= 1;
+        countdown.textContent = `Wylogowanie za: ${remaining} s`;
+        if (remaining <= 0) {
+            clearInterval(logoutTimer);
+            cleanupModalBlockers();
+            window.location.href = '{% url "logout" %}';
+        }
+    }, 1000);
+
+    document.getElementById('btnStay').onclick = () => {
+        clearInterval(logoutTimer);
+        cleanupModalBlockers();
+        modal.style.display = 'none';
+        resetIdleTimer();
+    };
+
+    document.getElementById('btnLogout').onclick = () => {
+        clearInterval(logoutTimer);
+        cleanupModalBlockers();
+        window.location.href = '{% url "logout" %}';
+    };
+}
+
+['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(event => {
+    document.addEventListener(event, resetIdleTimer);
+});
+
+resetIdleTimer();
+
+function Wyb() {
+    console.log("Wyb() uruchomiona");
+    var wybElement = document.getElementById("wyb");
+    var edytujBtn = document.getElementById("edytuj_btn");
+    console.log("wyb zaznaczony:", wybElement ? wybElement.checked : "nie znaleziono");
+    console.log("edytuj_btn element:", edytujBtn ? "istnieje" : "nie znaleziono");
+
+    if (document.getElementById("wyb").checked == true) {
+        document.getElementById("old").style.display = "inline";
+        document.getElementById("new").style.display = "none";
+        document.getElementById("edytuj_btn").style.display = "inline";
+        
+        // Przywróć wybrany pacjent z sessionStorage po powrocie ze strony edycji
+        var saved_pacjent_id = sessionStorage.getItem('selected_pacjent_id');
+        if (saved_pacjent_id) {
+            document.getElementById('iinlist').value = saved_pacjent_id;
+            sessionStorage.removeItem('selected_pacjent_id');
+            // Nie wyświetlaj automatycznie danych - użytkownik musi kliknąć na pacjenta
+        }
+    }
+    else if (document.getElementById("dod").checked == true) {
+        document.getElementById("old").style.display = "none";
+        document.getElementById("new").style.display = "inline";
+        document.getElementById("edytuj_btn").style.display = "none";
+
+        // Wyzeruj formularz
+        document.getElementById('edit_pacjent_id').value = "0";
+        document.getElementById('imie_input').value = "";
+        document.getElementById('nazwisko_input').value = "";
+        document.getElementById('data_urodzenia_input').value = "";
+        document.getElementById('plec_input').value = "M";
+        document.getElementById('nazwa_dokumentu_field').value = "";
+        document.getElementById('numer_dokumentu_field').value = "";
+        
+        // Resetuj przycisk
+        document.getElementById("zapisz_pacjenta_btn").textContent = "ZAPISZ";
+        
+        // Wyzeruj dane wyników, bo dodajemy nowego pacjenta
+        document.getElementById("info_data_urodzenia").innerHTML = "Data urodzenia: -";
+        document.getElementById("info_plec").innerHTML = "Płeć: -";
+        document.getElementById("info_nazwa").innerHTML = "Nazwa dokumentu: -";
+        document.getElementById("info_numer_dokumentu").innerHTML = "Numer dokumentu: -";
+        document.getElementById("info_wiek").innerHTML = "Wiek: -";
+        document.getElementById("red").innerHTML = "Czerwony: Brak wyników<br><br>";
+        document.getElementById("green").innerHTML = "Zielony: Brak wyników<br><br>";
+        document.getElementById("blue").innerHTML = "Niebieski: Brak wyników<br><br>";
+        document.getElementById("average").innerHTML = "Średnia całkowita: Brak wyników<br><br>";
+        document.getElementById("time").innerHTML = "Czas badania: Brak wyników";
+
+        document.getElementById("iinlist").value = "0";
+    }
+}
+function rozpocznijTest() {
+    var pacjentSelect = document.getElementById("iinlist");
+    var testSelect = document.getElementById("testyy");
+
+    if (!testSelect || testSelect.value == "0") {
+        alert("Najpierw wybierz badanie!");
+        return;
+    }
+    if (!pacjentSelect || pacjentSelect.value == "0") {
+        alert("Najpierw wybierz pacjenta!");
+        return;
+    }
+
+    var testUrl = testSelect.value;
+    if (testUrl.trim() === "") {
+        alert("Nieprawidłowy adres testu. Skontaktuj się z administratorem.");
+        return;
+    }
+
+    window.location.href = testUrl;
+}
+
+function exportWyniki() {
+    var pacjentSelect = document.getElementById('iinlist');
+    var testSelect = document.getElementById('testyy');
+    if (!pacjentSelect || pacjentSelect.value === '0') {
+        alert('Najpierw wybierz pacjenta, aby wyeksportować jego wyniki.');
+        return;
+    }
+    if (!testSelect || testSelect.value === '0') {
+        alert('Najpierw wybierz badanie, którego wyniki chcesz wyeksportować.');
+        return;
+    }
+    var testName = encodeURIComponent(testSelect.options[testSelect.selectedIndex].text);
+    var url = '{% url "export_wyniki" %}?test_name=' + testName;
+
+    fetch(url, {
+        method: 'GET',
+        headers: {
+            'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json'
+        }
+    }).then(response => {
+        var contentType = response.headers.get('content-type') || '';
+        if (response.ok && contentType.indexOf('application/json') !== -1) {
+            return response.json().then(data => {
+                alert(data.error || 'Wystąpił błąd podczas eksportu.');
+            });
+        }
+        if (!response.ok) {
+            return response.text().then(text => {
+                try {
+                    var data = JSON.parse(text);
+                    alert(data.error || 'Wystąpił błąd podczas eksportu.');
+                } catch (e) {
+                    alert('Wystąpił błąd podczas eksportu.');
+                }
+            });
+        }
+        return response.blob().then(blob => {
+            var filename = 'wyniki.xlsx';
+            var disposition = response.headers.get('content-disposition');
+            if (disposition) {
+                var match = /filename\*?=([^;]+)/i.exec(disposition);
+                if (match) {
+                    filename = match[1].trim().replace(/"/g, '');
+                }
+            }
+            var link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+    }).catch(() => {
+        alert('Wystąpił błąd sieci podczas eksportu.');
+    });
+}
+
+function setPendingInteractionLock(lock) {
+    var controls = [
+        document.getElementById('iinlist'),
+        document.getElementById('testyy'),
+        document.getElementById('start_btn'),
+        document.getElementById('export_btn'),
+        document.getElementById('log_out_btn'),
+        document.getElementById('wyb'),
+        document.getElementById('dod'),
+        document.getElementById('edytuj_btn'),
+        document.getElementById('zapisz_pacjenta_btn')
+    ];
+    controls.forEach(function(control) {
+        if (control) {
+            control.disabled = lock;
+        }
+    });
+
+    var formSections = [document.getElementById('old'), document.getElementById('new')];
+    formSections.forEach(function(section) {
+        if (section) {
+            Array.from(section.querySelectorAll('input, select, button')).forEach(function(element) {
+                if (element.id !== 'zapisz_wyniki_btn' && element.id !== 'skip_wyniki_btn') {
+                    element.disabled = lock;
+                }
+            });
+        }
+    });
+}
+
+function aktualizujWynikiWidocznosc() {
+    var testSelect = document.getElementById('testyy');
+    var wynikiDane = document.getElementById('wyniki_dane');
+    if (!testSelect || testSelect.value === '0') {
+        if (!loadPendingTestResults()) {
+            wynikiDane.style.display = 'none';
+        }
+    } else {
+        wynikiDane.style.display = 'block';
+    }
+}
+
+function loadPendingTestResults() {
+    var resultsJson = sessionStorage.getItem('wyniki');
+    var wynikiDane = document.getElementById('wyniki_dane');
+    var saveBtn = document.getElementById('zapisz_wyniki_btn');
+    var skipBtn = document.getElementById('skip_wyniki_btn');
+    var pendingMsg = document.getElementById('pending_results_message');
+    if (!resultsJson) {
+        saveBtn.style.display = 'none';
+        skipBtn.style.display = 'none';
+        pendingMsg.style.display = 'none';
+        return false;
+    }
+    try {
+        var wyniki = JSON.parse(resultsJson);
+        document.getElementById('test_kolorow').textContent = 'Wyniki zakończonego testu kolorów:';
+        document.getElementById('red').innerHTML = `Czerwony: ${wyniki.wynik_r}<br><br>`;
+        document.getElementById('green').innerHTML = `Zielony: ${wyniki.wynik_g}<br><br>`;
+        document.getElementById('blue').innerHTML = `Niebieski: ${wyniki.wynik_b}<br><br>`;
+        document.getElementById('average').innerHTML = `Średnia całkowita: ${wyniki.wynik_ogolny}<br><br>`;
+        document.getElementById('time').innerHTML = `Czas badania: ${wyniki.czas}`;
+        pendingMsg.textContent = 'Masz nowe wyniki testu do zapisania. Kliknij ZAPISZ lub POMIŃ.';
+        pendingMsg.style.display = 'block';
+        wynikiDane.style.display = 'block';
+        saveBtn.style.display = 'inline-block';
+        skipBtn.style.display = 'inline-block';
+        if (document.getElementById('testyy').value === '0') {
+            document.getElementById('testyy').value = '{% url "test" %}';
+        }
+        setPendingInteractionLock(true);
+        return true;
+    } catch (e) {
+        sessionStorage.removeItem('wyniki');
+        saveBtn.style.display = 'none';
+        skipBtn.style.display = 'none';
+        pendingMsg.style.display = 'none';
+        setPendingInteractionLock(false);
+        return false;
+    }
+}
+
+let zapiszWynikiInProgress = false;
+
+function skipWyniki() {
+    if (!confirm('Czy na pewno chcesz pominąć zapisanie tych wyników?')) {
+        return;
+    }
+    sessionStorage.removeItem('wyniki');
+    sessionStorage.removeItem('Karta');
+    sessionStorage.removeItem('WynR');
+    sessionStorage.removeItem('WynG');
+    sessionStorage.removeItem('WynB');
+    sessionStorage.removeItem('Sec');
+    document.getElementById('zapisz_wyniki_btn').style.display = 'none';
+    document.getElementById('skip_wyniki_btn').style.display = 'none';
+    document.getElementById('pending_results_message').style.display = 'none';
+    setPendingInteractionLock(false);
+    aktualizujWynikiWidocznosc();
+}
+
+function zapisz() {
+    var imie = document.getElementById('imie_input').value.trim();
+    var nazwisko = document.getElementById('nazwisko_input').value.trim();
+    var data_urodzenia = document.getElementById('data_urodzenia_input').value;
+    var plec = document.getElementById('plec_input').value;
+    var nazwa_dokumentu = document.getElementById('nazwa_dokumentu_field').value.trim();
+    var numer_dokumentu = document.getElementById('numer_dokumentu_field').value.trim();
+    var pacjent_id = document.getElementById('edit_pacjent_id').value;
+
+    if (!imie || !nazwisko || !data_urodzenia || !plec || !nazwa_dokumentu || !numer_dokumentu) {
+        alert('Wypełnij wszystkie pola pacjenta.');
+        return;
+    }
+
+    var formData = new FormData();
+    formData.append('imie', imie);
+    formData.append('nazwisko', nazwisko);
+    formData.append('data_urodzenia', data_urodzenia);
+    formData.append('plec', plec);
+    formData.append('nazwa_dokumentu', nazwa_dokumentu);
+    formData.append('numer_dokumentu', numer_dokumentu);
+    
+    // Jeśli pacjent_id istnieje, to edycja
+    if (pacjent_id && pacjent_id !== "0") {
+        formData.append('pacjent_id', pacjent_id);
+        var url = '{% url "aktualizuj_pacjenta" %}';
+        // Zapisz ID pacjenta do sessionStorage aby go przywrócić po przeładowaniu
+        sessionStorage.setItem('selected_pacjent_id', pacjent_id);
+    } else {
+        var url = '{% url "dodaj_pacjenta" %}';
+    }
+
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: formData,
+        redirect: 'follow'
+    }).then(response => {
+        window.location.reload();
+    }).catch(error => {
+        console.error('Błąd:', error);
+        alert('Błąd sieci podczas zapisu pacjenta.');
+    });
+}
+
+function zapiszWyniki() {
+    if (zapiszWynikiInProgress) {
+        return;
+    }
+    if (!confirm('Czy na pewno chcesz zapisać te wyniki do bazy?')) {
+        return;
+    }
+    var wyniki = sessionStorage.getItem('wyniki');
+    if (!wyniki) {
+        alert("Brak wyników do zapisania");
+        return;
+    }
+    zapiszWynikiInProgress = true;
+    var saveBtn = document.getElementById('zapisz_wyniki_btn');
+    var skipBtn = document.getElementById('skip_wyniki_btn');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'ZAPISYWANIE...';
+    }
+    if (skipBtn) {
+        skipBtn.disabled = true;
+    }
+    wyniki = JSON.parse(wyniki);
+    fetch('{% url "zapisz_wyniki" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(wyniki)
+    }).then(response => {
+        if (response.ok) {
+            alert("Wyniki zapisane!");
+            sessionStorage.removeItem('wyniki');
+            sessionStorage.removeItem('Karta');
+            sessionStorage.removeItem('WynR');
+            sessionStorage.removeItem('WynG');
+            sessionStorage.removeItem('WynB');
+            sessionStorage.removeItem('Sec');
+            setPendingInteractionLock(false);
+            location.reload();
+        } else {
+            response.json().then(data => {
+                alert(data.error || 'Błąd zapisu wyników.');
+            }).catch(() => {
+                alert('Błąd zapisu wyników.');
+            }).finally(() => {
+                zapiszWynikiInProgress = false;
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'ZAPISZ';
+                }
+                if (skipBtn) {
+                    skipBtn.disabled = false;
+                }
+            });
+        }
+    }).catch(() => {
+        alert('Błąd sieci podczas zapisu wyników.');
+    }).finally(() => {
+        zapiszWynikiInProgress = false;
+    });
+}
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+function Average(array) {
+    let sum = 0;
+    let avv = 0;
+    while (avv < array.length) {
+        sum += Math.abs(array[avv]);
+        avv++;
+    }
+    return sum/array.length;
+}
+
+function Statystyka() {
+    // Placeholder
+}
+
+function wyloguj() {
+    if (confirm("Czy na pewno chcesz się wylogować?")) {
+        window.location.href = '{% url "logout" %}';
+    }
+}
+
+function wybierzPacjenta() {
+    var select = document.getElementById("iinlist");
+    var pacjentId = select.value;
+
+    // Kontroluj widoczność wyników w oparciu o wybrany test
+    aktualizujWynikiWidocznosc();
+
+    if (pacjentId != "0") {
+        // AJAX do wyboru pacjenta
+        fetch('{% url "wybierz_pacjenta" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: 'pacjent_id=' + pacjentId
+        }).then(() => {
+            // Pobierz dane pacjenta
+            fetch(`/info/get_pacjent_data/${pacjentId}/`)
+            .then(response => response.json())
+            .then(data => {
+                var showResults = document.getElementById('testyy').value !== '0';
+                var wynikiDane = document.getElementById('wyniki_dane');
+                if (showResults) {
+                    wynikiDane.style.display = 'block';
+                } else {
+                    wynikiDane.style.display = 'none';
+                }
+                document.getElementById("info_data_urodzenia").innerHTML = `Data urodzenia: ${data.data_urodzenia}`;
+                document.getElementById("info_plec").innerHTML = `Płeć: ${data.plec_text}`;
+                document.getElementById("info_nazwa").innerHTML = `Nazwa dokumentu: ${data.nazwa_dokumentu}`;
+                document.getElementById("info_numer_dokumentu").innerHTML = `Numer dokumentu: ${data.numer_dokumentu}`;
+                document.getElementById("info_wiek").innerHTML = `Wiek: ${data.wiek}`;
+                if (data.mial_badanie) {
+                    document.getElementById("red").innerHTML = `Czerwony: ${data.ostatnie_badanie.wynik_r}<br><br>`;
+                    document.getElementById("green").innerHTML = `Zielony: ${data.ostatnie_badanie.wynik_g}<br><br>`;
+                    document.getElementById("blue").innerHTML = `Niebieski: ${data.ostatnie_badanie.wynik_b}<br><br>`;
+                    document.getElementById("average").innerHTML = `Średnia całkowita: ${data.ostatnie_badanie.wynik_ogolny}<br><br>`;
+                    document.getElementById("time").innerHTML = `Czas badania: ${data.ostatnie_badanie.czas_trwania}`;
+                } else {
+                    document.getElementById("red").innerHTML = `Czerwony: Brak wyników<br><br>`;
+                    document.getElementById("green").innerHTML = `Zielony: Brak wyników<br><br>`;
+                    document.getElementById("blue").innerHTML = `Niebieski: Brak wyników<br><br>`;
+                    document.getElementById("average").innerHTML = `Średnia całkowita: Brak wyników<br><br>`;
+                    document.getElementById("time").innerHTML = `Czas badania: Brak wyników`;
+                }
+            });
+        });
+    } else {
+        // Resetuj dane
+        document.getElementById("info_data_urodzenia").innerHTML = "Data urodzenia: -";
+        document.getElementById("info_plec").innerHTML = "Płeć: -";
+        document.getElementById("info_nazwa").innerHTML = "Nazwa dokumentu: -";
+        document.getElementById("info_numer_dokumentu").innerHTML = "Numer dokumentu: -";
+        document.getElementById("info_wiek").innerHTML = "Wiek: -";
+        document.getElementById("red").innerHTML = `Czerwony: <br><br>`;
+        document.getElementById("green").innerHTML = `Zielony: <br><br>`;
+        document.getElementById("blue").innerHTML = `Niebieski: <br><br>`;
+        document.getElementById("average").innerHTML = `Średnia całkowita: <br><br>`;
+        document.getElementById("time").innerHTML = `Czas badania:`;
+        document.getElementById("wyniki_dane").style.display = "none";
+    }
+}
+
+function edytujPacjenta() {
+    var select = document.getElementById("iinlist");
+    var pacjentId = select.value;
+    
+    if (!pacjentId || pacjentId == "0") {
+        alert("Najpierw trzeba wybrać pacjenta!");
+        return;
+    }
+
+    // Pobierz aktualne dane z API
+    fetch(`/info/get_pacjent_data/${pacjentId}/`)
+    .then(response => response.json())
+    .then(data => {
+        // Wczytaj dane do formularza
+        document.getElementById('edit_pacjent_id').value = pacjentId;
+        document.getElementById('imie_input').value = data.imie;
+        document.getElementById('nazwisko_input').value = data.nazwisko;
+        document.getElementById('data_urodzenia_input').value = data.data_urodzenia;
+        document.getElementById('plec_input').value = data.plec;
+        document.getElementById('nazwa_dokumentu_field').value = data.nazwa_dokumentu;
+        document.getElementById('numer_dokumentu_field').value = data.numer_dokumentu;
+        
+        // Przełącz na tryb edycji
+        document.getElementById("wyb").checked = false;
+        document.getElementById("dod").checked = true;
+        
+        // Zmień stany widoczności
+        document.getElementById("old").style.display = "none";
+        document.getElementById("new").style.display = "inline";
+        document.getElementById("edytuj_btn").style.display = "none";
+        
+        // Zmień tekst przycisku
+        document.getElementById("zapisz_pacjenta_btn").textContent = "AKTUALIZUJ";
+        
+        // Scroll do formularza
+        document.getElementById("new").scrollIntoView({ behavior: 'smooth' });
+    })
+    .catch(error => {
+        console.error('Błąd przy wczytywaniu danych:', error);
+        alert('Błąd przy wczytywaniu danych pacjenta');
+    });
+}
+</script>
+
+</html>

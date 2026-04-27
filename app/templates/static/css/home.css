@@ -1,0 +1,217 @@
+
+body {
+    background-color: #e0e0e0;
+    text-align: center;
+    font-family: Arial, Helvetica, sans-serif;
+    min-height: 95vh;
+}
+a:link, a:visited, a:hover, a:active {
+    text-decoration: none;
+    color: #333333;
+}
+a:link, a:visited, a:hover, a:active {
+    text-decoration: none;
+    color: #333333;
+}
+#top2 {
+    height: 100px;
+}
+#nav {
+    display: flex; border: 2px #333333 solid;
+}
+#klin, #test1 {
+    font-weight: bold;
+    margin: 5px;
+}
+#main {
+    height: 400px;
+}
+#main2 {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 20px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#klinicysta {
+    width: 100%;
+    text-align: left;
+    margin-bottom: 16px;
+}
+
+#gen {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    width: 100%;
+}
+
+#pacjent, #wyniki {
+    background: #ffffff;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.08);
+    flex: 1 1 300px;
+    min-width: 280px;
+}
+
+#bot {
+    height: 100px;
+    bottom: 0;
+}
+
+/* Wymuszenie wyświetlania bloków jako kolumn */
+#main2 > #klinicysta {
+    width: 100%;
+}
+#main2 > #gen {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+}
+#gen > #pacjent, #gen > #wyniki {
+    flex: 1 1 45%;
+    min-width: 320px;
+}
+#sqr1, #sqr2 {
+    height: 300px;
+    width: 300px;
+    border: 5px #e0e0e0 solid;
+    border-radius: 25px;
+}
+#sqr1 {
+    background-color: hsl(0,100%,50%);
+}
+#sqr2 {
+    background-color: hsl(0,100%,50%);
+}
+#divider {
+    width: 200px;
+    opacity: 0%;
+}
+#test {
+    display: none;
+}
+#squares {
+    display: flex;;
+    justify-content: center;
+}
+h1 {
+    color: #333333;
+    font-size: xx-large;
+    font-weight: bold;
+}
+#title {
+    color: #333333;
+    font-size: xx-large;
+    font-weight: bold;
+}
+#intro {
+    color: #333333;
+    font-size: xx-large;
+    font-weight: bold;
+}
+button, #vile {
+    background-color: #4b78a6;
+    color:white;
+    width: 140px;
+    height: 70px;
+    font-size: xx-large;
+    border-radius: 20px;
+    letter-spacing: 1px;
+    border: none;
+    cursor: pointer;
+}
+button:hover {
+    background-color: #29496a;
+}
+
+/* Mały przycisk */
+.btn-small {
+    background-color: #4b78a6;
+    color:white;
+    width: 100px;
+    height: 40px;
+    font-size: small;
+    border-radius: 20px;
+    letter-spacing: 1px;
+    border: none;
+    cursor: pointer;
+}
+.btn-small:hover {
+    background-color: #29496a;
+}
+
+/* Duży przycisk */
+.btn-large {
+    background-color: #4b78a6;
+    color:white;
+    width: 140px;
+    height: 70px;
+    font-size: xx-large;
+    border-radius: 20px;
+    letter-spacing: 1px;
+    border: none;
+    cursor: pointer;
+}
+.btn-large:hover {
+    background-color: #29496a;
+}
+.slider {
+    -webkit-appearance: none;  
+    appearance: none;
+    height: 10px;
+    border-radius: 20px;
+    width: 300px;
+    background: #C0C0C0; 
+    outline: none; /
+}
+.slider::-webkit-slider-thumb, .slider::-moz-range-thumb {
+    -webkit-appearance: none; 
+    appearance: none;
+    height: 30px;
+    width: 30px;
+    border-radius: 20px;
+    cursor: pointer;
+    background-color: #8A8A8A;
+
+}
+#slide {
+    height: 400px;
+    margin: 50px;
+    align-items: center;
+}
+#gen, #choice {
+    display: flex;
+    justify-content: space-around;
+}
+#wyniki, #pacjent {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+#klinicysta {
+    margin: 20px;
+}
+#wyb_bad, #wyb_dod {
+    margin: 5px; padding: 5px; 
+    background-color: #cbcbcb; font-weight: bold;
+    cursor: pointer;
+
+}
+#wyb_bad:hover, #wyb_dod:hover {
+    background-color: #969696;
+}
+.invis {
+    pointer-events: none;
+    background-color: #e0e0e0;
+    border: none;
+    display: none;
+
+}
+

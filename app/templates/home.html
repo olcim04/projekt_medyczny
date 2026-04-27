@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pol">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+        <link rel="stylesheet" href="/static/css/home.css">
+    
+        <title>Logowanie</title>
+    </head>
+    
+    <body>
+
+    <h1 id="title" style="color:#222222; font-size: 36px; text-align: center; margin-top: 5%;">
+        ZALOGUJ SIĘ <br><br>
+    </h1>
+
+    <div id="main">
+    {% if messages %}
+        {% for message in messages %}
+            <div style="color: red; margin-bottom: 15px;">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    <form method="post" action="{% url 'login' %}">
+        {% csrf_token %}
+
+    <label for="username">Login:</label>
+    <input type="text" id="username" name="username"><br><br>
+
+    <label for="password">Hasło:</label>
+    <input type="password" id="password" name="password"><br><br>
+
+    <input type="submit" value="Zaloguj" style="background-color: #4CAF50; color: white; padding: 12px 25px; border: none; border-radius: 4px; cursor: pointer;">
+
+    </form>
+    </div>
+
+    <script>
+    // Wyłączone wywołanie logout na beforeunload, bo przy przejściu do /info może wylogować użytkownika
+    // window.addEventListener('beforeunload', function (event) {
+    //     if (document.cookie.includes('sessionid')) {
+    //         fetch('/logout/', {
+    //             method: 'POST',
+    //             headers: {
+    //                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+    //             },
+    //             keepalive: true
+    //         });
+    //     }
+    // });
+    </script>
+
+    </body>
+</html>

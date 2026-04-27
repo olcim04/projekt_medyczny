@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/home.css' %}">
+    <title>Test Kolorów</title>
+</head>
+<body onload="Setup()">
+    <div id="top">
+        <div>
+            <div id="timerBox" style="font-size: 1rem; color: #222; margin-bottom: 10px;">
+                Czas testu: <span id="timer">00:00:00</span>
+            </div>
+            <button onclick="stopTest()" id="paz" style="background-color: #e0e0e0; border: none; color: #cbcbcb;">STOP</button>
+            <button onclick="wznówTest()" id="wznów_btn" style="background-color: #e0e0e0; border: none; color: #cbcbcb; display: none;">WZNÓW</button>
+            <button onclick="Powrot()" style="background-color: #e0e0e0; border: none; color: #cbcbcb;">WRÓĆ</button>
+        </div>
+        <h1 id="title" style="color: #222222;">
+            TEST KOLORÓW <br><br>
+        </h1>
+    </div>
+    <div id="main">
+        <div id="test">
+            <div id="squares">
+                <div id="sqr1"></div>
+                <div id="divider">
+                    <h1 id="t1">0</h1>
+                    <h1 id="t2">0</h1>
+                </div>
+                <div id="sqr2"></div>
+            </div>
+            <div id="slide">
+                <input oninput="Match()" onchange="Match()" type="range" min="10" max="90" value="50" class="slider" id="picker">
+            </div>
+        </div>
+        <div id="intro">
+            <h1>
+                Ten test sprawdza, jak rozpoznajesz kolory.<br>Na ekranie są dwa kwadraty.<br>
+                Za pomocą suwaka zmień kolor prawego kwadratu,<br> żeby był taki sam jak kwadrat po lewej.<br>
+                Jeśli jesteś gotowy(-a), naciśnij przycisk START.<br>
+            </h1>
+        </div>
+         
+    </div>
+    <div id="bot">
+        <button onclick="Change()" id="dal">START</button>
+    </div>
+    <div id="pauseOverlay" style="display:none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.95); z-index:1000; align-items:center; justify-content:center; text-align:center; padding: 20px;">
+        <div style="max-width: 420px; border: 2px solid #444; background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); margin: auto;">
+            <h1 style="font-size: 1.5rem; color: #222; margin-bottom: 16px;">Test wstrzymany</h1>
+            <p style="font-size: 1rem; color: #333; margin-bottom: 24px;">Aby powrócić do testu kliknij poniższy przycisk.</p>
+            <button onclick="resumeTest()" style="background-color:#4caf50; border:none; color:white; padding:12px 20px; border-radius:8px; font-size:1rem;">WRÓĆ DO TESTU</button>
+        </div>
+    </div>
+</body>
+
+<script>
+        let L = 50;
+        let stage = 0;
+        let R = 0;
+        let Wyn = 0;
+        let Karta = [];
+        let WynR = [];
+        let WynG = [];
+        let WynB = [];
+        let Pula = [0,0,0,0,0,0,120,120,120,120,120,120,240,240,240,240,240,240];
+        let P = 0;
+        let Sec = 0;
+        let c = false;
+        let paused = false;
+        let timeString = '00:00:00';
+    function Setup(){
+        Losu(Pula);
+    }
+    function Match() {
+        L = document.getElementById("picker").value;
+        switch (stage) {
+        case 1: 
+        document.getElementById("sqr2").style.backgroundColor = `hsl(0,100%,${L}%)`;
+        document.getElementById("t1").textContent = `${L}`;
+        document.getElementById("t2").textContent = `${R}`;
+        break;
+        case 2: 
+        document.getElementById("sqr2").style.backgroundColor = `hsl(120,100%,${L}%)`;
+        document.getElementById("t1").textContent = `${L}`;
+        document.getElementById("t2").textContent = `${R}`;
+        break;
+        case 3: 
+        document.getElementById("sqr2").style.backgroundColor = `hsl(240,100%,${L}%)`;
+        document.getElementById("t1").textContent = `${L}`;
+        document.getElementById("t2").textContent = `${R}`;
+        break;
+        default: 
+        document.getElementById("sqr2").style.backgroundColor = `hsl(${Pula[P]},100%,${L}%)`;
+        document.getElementById("t1").textContent = `${L}`;
+        document.getElementById("t2").textContent = `${R}`;
+        break;
+        }
+        
+    }
+    function Change() {
+        switch (stage) {
+            case 0:
+                L = 50;
+                R = 80;
+                document.getElementById("picker").value = 50;
+                document.getElementById("intro").style.display = "none";
+                document.getElementById("test").style.display = "inline";
+                document.getElementById("dal").textContent = "DALEJ";
+                document.getElementById("title").innerHTML = `Dopasuj kolor prawego kwadratu do koloru kwadratu po lewej.<br> Naciśnij DALEJ, gdy skończysz.`;
+                document.getElementById("sqr1").style.backgroundColor = `hsl(0,100%,80%)`;
+                document.getElementById("sqr2").style.backgroundColor = `hsl(0,100%,50%)`;
+                document.getElementById("t1").textContent = `${L}`;
+                document.getElementById("t2").textContent = `${R}`;
+                stage++;
+            break;
+             case 1:
+                L = 50;
+                R = 20;
+                document.getElementById("picker").value = 50;
+                document.getElementById("intro").style.display = "none";
+                document.getElementById("test").style.display = "inline";
+                document.getElementById("dal").textContent = "DALEJ";
+                document.getElementById("sqr1").style.backgroundColor = `hsl(120,100%,20%)`;
+                document.getElementById("sqr2").style.backgroundColor = `hsl(120,100%,50%)`;
+                document.getElementById("t1").textContent = `${L}`;
+                document.getElementById("t2").textContent = `${R}`;
+                stage++;
+            break;
+             case 2:
+                L = 50;
+                R = 50;
+                document.getElementById("picker").value = 50;
+                document.getElementById("intro").style.display = "none";
+                document.getElementById("test").style.display = "inline";
+                document.getElementById("dal").textContent = "DALEJ";
+                document.getElementById("sqr1").style.backgroundColor = `hsl(240,100%,50%)`;
+                document.getElementById("sqr2").style.backgroundColor = `hsl(240,100%,50%)`;
+                document.getElementById("t1").textContent = `${L}`;
+                document.getElementById("t2").textContent = `${R}`;
+                stage++;
+            break;
+            case 3:
+                document.getElementById("intro").style.display = "inline";
+                document.getElementById("intro").innerHTML = "Teraz zacznie się test.<br>Zobaczysz 18 par kwadratów w różnych kolorach.<br>W każdej parze dopasuj kolor prawego kwadratu do koloru kwadratu po lewej.<br>Naciśnij DALEJ, aby rozpocząć."
+                document.getElementById("test").style.display = "none";
+                stage++;
+            break;
+            case 4:
+                L = 50;
+                R = Random(20,80);
+                document.getElementById("picker").value = 50;
+                document.getElementById("intro").style.display = "none";
+                document.getElementById("test").style.display = "inline";
+                document.getElementById("sqr1").style.backgroundColor = `hsl(${Pula[P]},100%,${R}%)`;
+                document.getElementById("sqr2").style.backgroundColor = `hsl(${Pula[P]},100%,50%)`;
+                document.getElementById("t1").textContent = `${L}`;
+                document.getElementById("t2").textContent = `${R}`;
+                stage++;
+                c = true;
+            break;
+            default:
+                c = true;
+                Wyn = L - R;
+                Karta[P] = Wyn;
+                Wyniki();
+                P++;
+                R = Random(20,80);
+                document.getElementById("picker").value = 50
+                document.getElementById("sqr1").style.backgroundColor = `hsl(${Pula[P]},100%,${R}%)`;
+                document.getElementById("sqr2").style.backgroundColor = `hsl(${Pula[P]},100%,50%)`;
+                //document.getElementById("title").textContent = `${Pula[P]}`;
+                stage++;
+            break;
+            case 22:
+                Wyn = L - R;
+                Karta[P] = Wyn;
+                Wyniki();
+                document.getElementById("intro").style.display = "inline";
+                document.getElementById("intro").innerHTML = `KONIEC TESTU`
+                document.getElementById("test").style.display = "none";
+                document.getElementById("dal").textContent = "END";
+                c = false;
+                /*window.sessionStorage.setItem(`Karta`, `${JSON.stringify(Karta)}`);
+                sessionStorage.setItem(`WynR`, `${JSON.stringify(WynR)}`);
+                sessionStorage.setItem(`WynG`, `${JSON.stringify(WynG)}`);
+                sessionStorage.setItem(`WynB`, `${JSON.stringify(WynB)}`);
+                sessionStorage.setItem(`Sec`, `${Sec}`);*/
+                console.log(Karta.length)
+                console.log(Karta)
+                stage++
+            break;
+            case 23:
+                window.sessionStorage.setItem(`Karta`, `${JSON.stringify(Karta)}`);
+                sessionStorage.setItem(`WynR`, `${JSON.stringify(WynR)}`);
+                sessionStorage.setItem(`WynG`, `${JSON.stringify(WynG)}`);
+                sessionStorage.setItem(`WynB`, `${JSON.stringify(WynB)}`);
+                sessionStorage.setItem(`Sec`, `${timeString}`);                // Zapisz wyniki do sessionStorage dla zapisu
+                var wyniki = {
+                    czas: timeString,
+                    wynik_r: Average(WynR),
+                    wynik_g: Average(WynG),
+                    wynik_b: Average(WynB),
+                    wynik_ogolny: (Average(WynR) + Average(WynG) + Average(WynB)) / 3
+                };
+                sessionStorage.setItem('wyniki', JSON.stringify(wyniki));
+                window.location.href = '{% url "info" %}';
+                break;
+        }
+    
+        
+    }
+    var dateeee = new Date(0);
+
+    function Czas() {
+        if (c==true && !paused) {Sec++;}
+        dateeee.setSeconds(Sec);
+        timeString = dateeee.toISOString().substring(11, 19);
+        const timerEl = document.getElementById("timer");
+        if (timerEl) {
+            timerEl.textContent = timeString;
+        }
+    }
+    const Zegarek = setInterval(Czas, 1000)
+    
+    function Average(array) {
+        if (!array || array.length === 0) {
+            return 0;
+        }
+        let sum = 0;
+        for (let i = 0; i < array.length; i++) {
+            sum += Number(array[i]) || 0;
+        }
+        return sum / array.length;
+    }
+
+    function Random(min, max) {
+        return Math.floor(Math.random() * (max - min + 1) ) + min;
+    } 
+    function Losu(array) {
+    var i = array.length,
+        j = 0,
+        temp;
+
+    while (i--) {
+
+        j = Math.floor(Math.random() * (i+1));
+
+        temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+
+    }
+
+    return array;
+}
+
+    function Powrot() {
+        if (confirm("Czy na pewno chcesz zakończyć test?")) {
+            window.location.href = '{% url "info" %}';
+        }
+    }
+    function Wyniki() {
+        switch (Pula[P]) {
+            case 0:
+                WynR.push(Wyn);
+                break;
+            case 120:
+                WynG.push(Wyn);
+                break;
+            case 240:
+                WynB.push(Wyn);
+                break;
+        }
+    }
+    function stopTest() {
+        paused = true;
+        document.getElementById("pauseOverlay").style.display = "flex";
+        document.getElementById("paz").style.display = "none";
+        document.getElementById("wznów_btn").style.display = "none";
+    }
+    function resumeTest() {
+        paused = false;
+        document.getElementById("pauseOverlay").style.display = "none";
+        document.getElementById("paz").style.display = "inline";
+        document.getElementById("wznów_btn").style.display = "none";
+    }
+
+    function wznówTest() {
+        resumeTest();
+    }
+
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
+    }
+
+</script>
+
+</html>
