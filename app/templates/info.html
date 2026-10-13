@@ -90,6 +90,7 @@
                 <select name="testyy" id="testyy" onchange="aktualizujWynikiWidocznosc(); if (document.getElementById('iinlist').value !== '0') wybierzPacjenta();">
                 <option value="0">Wybierz badanie</option>
                 <option value="{% url 'test' %}">Test kolorów</option>
+                <option value="{% url 'test2' %}">Test twarzy</option>
                 </select> <br><br>
                 <button class="btn-small" onclick="rozpocznijTest()" id="start_btn">START</button>
                 <button class="btn-small" onclick="exportWyniki()" id="export_btn" style="margin-left: 10px;">EKSPORTUJ</button>
@@ -97,11 +98,22 @@
                 <div id="wyniki_dane" style="display:none; margin-top: 20px;">
                     <div id="test_kolorow"></div>
                     <div id="pending_results_message" style="display:none; margin-bottom: 10px; font-weight: bold; color: #333;"></div>
-                    <div id="red">Czerwony: {% if wyniki %}{{ wyniki.wynik_r|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
-                    <div id="green">Zielony: {% if wyniki %}{{ wyniki.wynik_g|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
-                    <div id="blue">Niebieski: {% if wyniki %}{{ wyniki.wynik_b|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
-                    <div id="average">Średnia całkowita: {% if wyniki %}{{ wyniki.wynik_ogolny|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
-                    <div id="time">Czas badania: {% if wyniki %}{{ wyniki.czas_trwania|default:'00:00:00' }}{% else %}Brak wyników{% endif %}</div>
+                    <!-- Kolorowy test -->
+                    <div id="color_results">
+                        <div id="red">Czerwony: {% if wyniki and wyniki.test_type != 'twarze' %}{{ wyniki.wynik_r|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
+                        <div id="green">Zielony: {% if wyniki and wyniki.test_type != 'twarze' %}{{ wyniki.wynik_g|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
+                        <div id="blue">Niebieski: {% if wyniki and wyniki.test_type != 'twarze' %}{{ wyniki.wynik_b|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
+                        <div id="average">Średnia całkowita: {% if wyniki and wyniki.test_type != 'twarze' %}{{ wyniki.wynik_ogolny|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
+                        <div id="time">Czas badania: {% if wyniki and wyniki.test_type != 'twarze' %}{{ wyniki.czas_trwania|default:'00:00:00' }}{% else %}Brak wyników{% endif %}</div>
+                    </div>
+                    <!-- Test twarzy -->
+                    <div id="face_results" style="display:none;">
+                        <div id="face_overall">Prawidłowe odpowiedzi: -/30<br><br></div>
+                        <div id="face_gender">Mężczyźni: - | Kobiety: -<br><br></div>
+                        <div id="face_age">Dzieci: - | Średni wiek: - | Podeszły wiek: -<br><br></div>
+                        <div id="face_stages">Etap 1: - | Etap 2: - | Etap 3: - | Etap 4: - | Etap 5: -<br><br></div>
+                        <div id="face_time">Czas badania: -</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -243,6 +255,38 @@ function Wyb() {
         document.getElementById("iinlist").value = "0";
     }
 }
+function getSelectedTestType() {
+    var testSelect = document.getElementById('testyy');
+    if (!testSelect) {
+        return null;
+    }
+    var selectedText = '';
+    try {
+        selectedText = testSelect.options[testSelect.selectedIndex].text.toLowerCase();
+    } catch (e) {
+        selectedText = testSelect.value.toLowerCase();
+    }
+    if (selectedText.includes('twar')) {
+        return 'twarze';
+    }
+    if (selectedText.includes('kolor')) {
+        return 'kolory';
+    }
+    return null;
+}
+
+function showResultContainersForTest(type) {
+    var colorContainer = document.getElementById('color_results');
+    var faceContainer = document.getElementById('face_results');
+    if (type === 'twarze') {
+        if (colorContainer) colorContainer.style.display = 'none';
+        if (faceContainer) faceContainer.style.display = 'block';
+    } else {
+        if (colorContainer) colorContainer.style.display = 'block';
+        if (faceContainer) faceContainer.style.display = 'none';
+    }
+}
+
 function rozpocznijTest() {
     var pacjentSelect = document.getElementById("iinlist");
     var testSelect = document.getElementById("testyy");
@@ -353,6 +397,7 @@ function setPendingInteractionLock(lock) {
 }
 
 function aktualizujWynikiWidocznosc() {
+    // No-op placeholder
     var testSelect = document.getElementById('testyy');
     var wynikiDane = document.getElementById('wyniki_dane');
     if (!testSelect || testSelect.value === '0') {
@@ -360,7 +405,20 @@ function aktualizujWynikiWidocznosc() {
             wynikiDane.style.display = 'none';
         }
     } else {
+        // decide which result container to show based on selected test
         wynikiDane.style.display = 'block';
+        var optText = '';
+        try { optText = testSelect.options[testSelect.selectedIndex].text.toLowerCase(); } catch(e){}
+        var isFace = optText.includes('twar') || (testSelect.value && testSelect.value.indexOf('test2') !== -1);
+        var colorContainer = document.getElementById('color_results');
+        var faceContainer = document.getElementById('face_results');
+        if (isFace) {
+            if (colorContainer) colorContainer.style.display = 'none';
+            if (faceContainer) faceContainer.style.display = 'block';
+        } else {
+            if (colorContainer) colorContainer.style.display = 'block';
+            if (faceContainer) faceContainer.style.display = 'none';
+        }
     }
 }
 
@@ -378,20 +436,51 @@ function loadPendingTestResults() {
     }
     try {
         var wyniki = JSON.parse(resultsJson);
-        document.getElementById('test_kolorow').textContent = 'Wyniki zakończonego testu kolorów:';
-        document.getElementById('red').innerHTML = `Czerwony: ${wyniki.wynik_r}<br><br>`;
-        document.getElementById('green').innerHTML = `Zielony: ${wyniki.wynik_g}<br><br>`;
-        document.getElementById('blue').innerHTML = `Niebieski: ${wyniki.wynik_b}<br><br>`;
-        document.getElementById('average').innerHTML = `Średnia całkowita: ${wyniki.wynik_ogolny}<br><br>`;
-        document.getElementById('time').innerHTML = `Czas badania: ${wyniki.czas}`;
+        
+        // Sprawdzenie czy to test kolorów czy test twarzy
+        var colorContainer = document.getElementById('color_results');
+        var faceContainer = document.getElementById('face_results');
+        function showColor(w) {
+            if (colorContainer) colorContainer.style.display = 'block';
+            if (faceContainer) faceContainer.style.display = 'none';
+            document.getElementById('test_kolorow').textContent = 'Wyniki zakończonego testu kolorów:';
+            document.getElementById('red').innerHTML = `Czerwony: ${w.wynik_r}<br><br>`;
+            document.getElementById('green').innerHTML = `Zielony: ${w.wynik_g}<br><br>`;
+            document.getElementById('blue').innerHTML = `Niebieski: ${w.wynik_b}<br><br>`;
+            document.getElementById('average').innerHTML = `Średnia całkowita: ${w.wynik_ogolny}<br><br>`;
+            document.getElementById('time').innerHTML = `Czas badania: ${w.czas}`;
+            if (document.getElementById('testyy').value === '0') {
+                document.getElementById('testyy').value = '{% url "test" %}';
+            }
+        }
+        function showFace(w) {
+            if (colorContainer) colorContainer.style.display = 'none';
+            if (faceContainer) faceContainer.style.display = 'block';
+            document.getElementById('test_kolorow').textContent = 'Wyniki zakończonego testu twarzy:';
+            document.getElementById('face_overall').innerHTML = `Prawidłowe odpowiedzi: ${w.wynik_ogolny || '-'} /30<br><br>`;
+            document.getElementById('face_gender').innerHTML = `Mężczyźni: ${w.wynik_m || '-'} | Kobiety: ${w.wynik_k || '-'}<br><br>`;
+            document.getElementById('face_age').innerHTML = `Dzieci: ${w.wynik_d || '-'} | Średni wiek: ${w.wynik_s || '-'} | Podeszły wiek: ${w.wynik_p || '-'}<br><br>`;
+            document.getElementById('face_stages').innerHTML = `Etap 1: ${w.wynik_1 || '-'} | Etap 2: ${w.wynik_2 || '-'} | Etap 3: ${w.wynik_3 || '-'} | Etap 4: ${w.wynik_4 || '-'} | Etap 5: ${w.wynik_5 || '-'}<br><br>`;
+            document.getElementById('face_time').innerHTML = `Czas badania: ${w.czas}`;
+            if (document.getElementById('testyy').value === '0') {
+                document.getElementById('testyy').value = '{% url "test2" %}';
+            }
+        }
+
+        if (wyniki.wynik_r !== undefined) {
+            showColor(wyniki);
+        } else if (wyniki.wynik_m !== undefined) {
+            showFace(wyniki);
+        } else if (wyniki.wyniki_json !== undefined) {
+            // whole result stored as json (z testu twarzy)
+            showFace(wyniki);
+        }
+        
         pendingMsg.textContent = 'Masz nowe wyniki testu do zapisania. Kliknij ZAPISZ lub POMIŃ.';
         pendingMsg.style.display = 'block';
         wynikiDane.style.display = 'block';
         saveBtn.style.display = 'inline-block';
         skipBtn.style.display = 'inline-block';
-        if (document.getElementById('testyy').value === '0') {
-            document.getElementById('testyy').value = '{% url "test" %}';
-        }
         setPendingInteractionLock(true);
         return true;
     } catch (e) {
@@ -600,18 +689,59 @@ function wybierzPacjenta() {
                 document.getElementById("info_nazwa").innerHTML = `Nazwa dokumentu: ${data.nazwa_dokumentu}`;
                 document.getElementById("info_numer_dokumentu").innerHTML = `Numer dokumentu: ${data.numer_dokumentu}`;
                 document.getElementById("info_wiek").innerHTML = `Wiek: ${data.wiek}`;
+                var selectedType = getSelectedTestType();
+                showResultContainersForTest(selectedType);
                 if (data.mial_badanie) {
-                    document.getElementById("red").innerHTML = `Czerwony: ${data.ostatnie_badanie.wynik_r}<br><br>`;
-                    document.getElementById("green").innerHTML = `Zielony: ${data.ostatnie_badanie.wynik_g}<br><br>`;
-                    document.getElementById("blue").innerHTML = `Niebieski: ${data.ostatnie_badanie.wynik_b}<br><br>`;
-                    document.getElementById("average").innerHTML = `Średnia całkowita: ${data.ostatnie_badanie.wynik_ogolny}<br><br>`;
-                    document.getElementById("time").innerHTML = `Czas badania: ${data.ostatnie_badanie.czas_trwania}`;
+                    var last = data.ostatnie_badanie;
+                    if (selectedType === 'twarze') {
+                        last = data.ostatnie_badanie_twarze || data.ostatnie_badanie;
+                    } else if (selectedType === 'kolory') {
+                        last = data.ostatnie_badanie_kolory || data.ostatnie_badanie;
+                    }
+                    if (selectedType === 'twarze') {
+                        if (last && (last.test_type === 'twarze' || last.wyniki_json)) {
+                            var w = last.wyniki_json || {};
+                            document.getElementById('face_overall').innerHTML = `Prawidłowe odpowiedzi: ${w.wynik_ogolny || last.wynik_ogolny || '-'} /30<br><br>`;
+                            document.getElementById('face_gender').innerHTML = `Mężczyźni: ${w.wynik_m || '-'} | Kobiety: ${w.wynik_k || '-'}<br><br>`;
+                            document.getElementById('face_age').innerHTML = `Dzieci: ${w.wynik_d || '-'} | Średni wiek: ${w.wynik_s || '-'} | Podeszły wiek: ${w.wynik_p || '-'}<br><br>`;
+                            document.getElementById('face_stages').innerHTML = `Etap 1: ${w.wynik_1 || '-'} | Etap 2: ${w.wynik_2 || '-'} | Etap 3: ${w.wynik_3 || '-'} | Etap 4: ${w.wynik_4 || '-'} | Etap 5: ${w.wynik_5 || '-'}<br><br>`;
+                            document.getElementById('face_time').innerHTML = `Czas badania: ${w.czas || last.czas_trwania || '-'} `;
+                        } else {
+                            document.getElementById('face_overall').innerHTML = `Prawidłowe odpowiedzi: -/30<br><br>`;
+                            document.getElementById('face_gender').innerHTML = `Mężczyźni: - | Kobiety: -<br><br>`;
+                            document.getElementById('face_age').innerHTML = `Dzieci: - | Średni wiek: - | Podeszły wiek: -<br><br>`;
+                            document.getElementById('face_stages').innerHTML = `Etap 1: - | Etap 2: - | Etap 3: - | Etap 4: - | Etap 5: -<br><br>`;
+                            document.getElementById('face_time').innerHTML = `Czas badania: -`;
+                        }
+                    } else {
+                        if (last && last.test_type === 'kolory') {
+                            document.getElementById("red").innerHTML = `Czerwony: ${last.wynik_r}<br><br>`;
+                            document.getElementById("green").innerHTML = `Zielony: ${last.wynik_g}<br><br>`;
+                            document.getElementById("blue").innerHTML = `Niebieski: ${last.wynik_b}<br><br>`;
+                            document.getElementById("average").innerHTML = `Średnia całkowita: ${last.wynik_ogolny}<br><br>`;
+                            document.getElementById("time").innerHTML = `Czas badania: ${last.czas_trwania}`;
+                        } else {
+                            document.getElementById("red").innerHTML = `Czerwony: Brak wyników<br><br>`;
+                            document.getElementById("green").innerHTML = `Zielony: Brak wyników<br><br>`;
+                            document.getElementById("blue").innerHTML = `Niebieski: Brak wyników<br><br>`;
+                            document.getElementById("average").innerHTML = `Średnia całkowita: Brak wyników<br><br>`;
+                            document.getElementById("time").innerHTML = `Czas badania: Brak wyników`;
+                        }
+                    }
                 } else {
-                    document.getElementById("red").innerHTML = `Czerwony: Brak wyników<br><br>`;
-                    document.getElementById("green").innerHTML = `Zielony: Brak wyników<br><br>`;
-                    document.getElementById("blue").innerHTML = `Niebieski: Brak wyników<br><br>`;
-                    document.getElementById("average").innerHTML = `Średnia całkowita: Brak wyników<br><br>`;
-                    document.getElementById("time").innerHTML = `Czas badania: Brak wyników`;
+                    if (selectedType === 'twarze') {
+                        document.getElementById('face_overall').innerHTML = `Prawidłowe odpowiedzi: -/30<br><br>`;
+                        document.getElementById('face_gender').innerHTML = `Mężczyźni: - | Kobiety: -<br><br>`;
+                        document.getElementById('face_age').innerHTML = `Dzieci: - | Średni wiek: - | Podeszły wiek: -<br><br>`;
+                        document.getElementById('face_stages').innerHTML = `Etap 1: - | Etap 2: - | Etap 3: - | Etap 4: - | Etap 5: -<br><br>`;
+                        document.getElementById('face_time').innerHTML = `Czas badania: -`;
+                    } else {
+                        document.getElementById("red").innerHTML = `Czerwony: Brak wyników<br><br>`;
+                        document.getElementById("green").innerHTML = `Zielony: Brak wyników<br><br>`;
+                        document.getElementById("blue").innerHTML = `Niebieski: Brak wyników<br><br>`;
+                        document.getElementById("average").innerHTML = `Średnia całkowita: Brak wyników<br><br>`;
+                        document.getElementById("time").innerHTML = `Czas badania: Brak wyników`;
+                    }
                 }
             });
         });

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/home.css' %}">
+    <style>
+        /* Layout dla trzech opcji - obok siebie */
+        #triple { display:flex; gap:12px; justify-content:center; align-items:center; }
+        .tri { width:30%; border:2px solid #e0e0e0; padding:8px; box-sizing:border-box; cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:6px; background:#fff; }
+        .tri img { max-width:100%; height:auto; display:block; }
+        .tri.selected { border-color:#4b78a6; box-shadow:0 4px 12px rgba(75,120,166,0.18); }
+        #ttall img { max-width:100%; height:auto; display:block; margin:0 auto; }
+        #test { text-align:center; }
+    </style>
+    <title>Test Twarzy</title>
+</head>
+<body onload="Setup()">
+    <div id="top">
+        <div>
+            <div id="timerBox" style="font-size: 1rem; color: #222; margin-bottom: 10px;">
+                Czas testu: <span id="timer">00:00:00</span>
+            </div>
+            <button onclick="stopTest()" id="paz" style="background-color: #e0e0e0; border: none; color: #cbcbcb;">STOP</button>
+            <button onclick="wznówTest()" id="wznów_btn" style="background-color: #e0e0e0; border: none; color: #cbcbcb; display: none;">WZNÓW</button>
+            <button onclick="Powrot()" style="background-color: #e0e0e0; border: none; color: #cbcbcb;">WRÓĆ</button>
+        </div>
+        <h1 id="title" style="color: #222222;">
+            TEST TWARZY <br><br>
+        </h1>
+    </div>
+    <div id="main">
+        <div id="test">
+            <div id="triple">
+                <div id="t1" class="tri" onclick="Choice(1)"><img src="./testimg/1test.png" alt=""> </div>
+                <div id="t2" class="tri" onclick="Choice(2)"><img src="./testimg/2test.png" alt=""></div>
+                <div id="t3" class="tri" onclick="Choice(3)"><img src="./testimg/3test.png" alt=""></div>
+            </div>
+            <div id="ttall"><img src="./testimg/w1.png" alt=""></div>
+        </div>
+        <div id="intro">
+            <h1>
+                Ten test sprawdza, jak dobrze rozpoznajesz twarze.<br><br>Twoim zadaniem będzie rozpoznać, jaką twarz widziałeś(-aś) wcześniej.<br><br>
+                Jeśli jesteś gotowy(-a), naciśnij przycisk START i przejdź do rozgrzewki.<br>
+            </h1>
+        </div>
+    </div>
+    <div id="bot">
+        <button onclick="Change()" id="dal">START</button>
+    </div>
+    <div id="pauseOverlay" style="display:none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.95); z-index:1000; align-items:center; justify-content:center; text-align:center; padding: 20px;">
+        <div style="max-width: 420px; border: 2px solid #444; background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); margin: auto;">
+            <h1 style="font-size: 1.5rem; color: #222; margin-bottom: 16px;">Test wstrzymany</h1>
+            <p style="font-size: 1rem; color: #333; margin-bottom: 24px;">Aby powrócić do testu kliknij poniższy przycisk.</p>
+            <button onclick="resumeTest()" style="background-color:#4caf50; border:none; color:white; padding:12px 20px; border-radius:8px; font-size:1rem;">WRÓĆ DO TESTU</button>
+        </div>
+    </div>
+</body>
+
+<script>
+
+function Twarz(plec, wiek, kat, bonus, link) {
+    this.plec = plec;
+    this.wiek = wiek;
+    this.kat = kat;
+    this.bonus = bonus;
+    this.link = link;
+}
+
+const Twarz0 = new Twarz ("M","1","wprost","null","w0.png");
+const Twarz1 = new Twarz ("M","1","wprost","null","w1.png");
+const Twarz2 = new Twarz ("F","1","wprost","swiatlo","w2.png");
+const Twarz3 = new Twarz ("M","1","wprost","szum","w3.png");
+const Twarz4 = new Twarz ("F","1","lewo","null","w4.png");
+const Twarz5 = new Twarz ("M","1","prawo","null","w5.png");
+const Twarz6 = new Twarz ("F","2","wprost","null","w6.png");
+const Twarz7 = new Twarz ("M","2","wprost","swiatlo","w7.png");
+const Twarz8 = new Twarz ("F","2","wprost","szum","w8.png");
+const Twarz9 = new Twarz ("M","2","lewo","null","w9.png");
+const Twarz10 = new Twarz ("F","2","prawo","null","w10.png");
+const Twarz11 = new Twarz ("M","3","wprost","null","w11.png");
+const Twarz12 = new Twarz ("F","3","wprost","swiatlo","w12.png");
+const Twarz13 = new Twarz ("M","3","wprost","szum","w13.png");
+const Twarz14 = new Twarz ("F","3","lewo","null","w14.png");
+const Twarz15 = new Twarz ("M","3","prawo","null","w15.png");
+const Twarz16 = new Twarz ("F","1","wprost","null","w16.png");
+const Twarz17 = new Twarz ("M","1","wprost","swiatlo","w17.png");
+const Twarz18 = new Twarz ("F","1","wprost","szum","w18.png");
+const Twarz19 = new Twarz ("M","1","lewo","null","w19.png");
+const Twarz20 = new Twarz ("F","1","prawo","null","w20.png");
+const Twarz21 = new Twarz ("M","2","wprost","null","w21.png");
+const Twarz22 = new Twarz ("F","2","wprost","swiatlo","w22.png");
+const Twarz23 = new Twarz ("M","2","wprost","szum","w23.png");
+const Twarz24 = new Twarz ("F","2","lewo","null","w24.png");
+const Twarz25 = new Twarz ("M","2","prawo","null","w25.png");
+const Twarz26 = new Twarz ("F","3","wprost","null","w26.png");
+const Twarz27 = new Twarz ("M","3","wprost","swiatlo","w27.png");
+const Twarz28 = new Twarz ("F","3","wprost","szum","w28.png");
+const Twarz29 = new Twarz ("M","3","lewo","null","w29.png");
+const Twarz30 = new Twarz ("F","3","prawo","null","w30.png");
+
+let stage = 0;
+let Licznik = 0;
+let P = 0;
+let Sec = 0;
+let c = false;
+let choice = 0;
+let paused = false;
+let W0 = [Twarz0];
+let W1 = [Twarz1,Twarz2,Twarz3,Twarz4,Twarz5,Twarz6];
+let W2 = [Twarz7,Twarz8,Twarz9,Twarz10,Twarz11,Twarz12];
+let W3 = [Twarz13,Twarz14,Twarz15,Twarz16,Twarz17,Twarz18];
+let W4 = [Twarz19,Twarz20,Twarz21,Twarz22,Twarz23,Twarz24];
+let W5 = [Twarz25,Twarz26,Twarz27,Twarz28,Twarz29,Twarz30];
+let Wzory = [1,2,3,4];
+let ListaTwarzy = [];
+var [wynik_1,wynik_2,wynik_3,wynik_4,wynik_5,wynik_M,wynik_F,wynik_dzieci,wynik_sredni,wynik_starszy,wynik_ogolny] = [0,0,0,0,0,0,0,0,0,0,0];
+let Kolej;
+var [czas_1,czas_2,czas_3,czas_4,czas_5,czas_M,czas_F,czas_dzieci,czas_sredni,czas_starszy,czas_ogolny] = [0,0,0,0,0,0,0,0,0,0,0];
+let Opcje = [1,2,3,4,5,6,7];
+let progress = 0;
+let Wynik = 0;
+var timeString = '00:00:00';
+var dateeee = new Date(0);
+
+function Cece(){
+    c=!c
+    if (c==false) {document.getElementById("paz").style.backgroundColor = "#29496a";}
+    else if (c==true) {document.getElementById("paz").style.backgroundColor = "#e0e0e0";}
+}
+
+function Setup(){
+    choice = 0;
+    c = false;
+    progress = 0;
+    WW1 = Losu(W1);
+    WW2 = Losu(W2);
+    WW3 = Losu(W3);
+    WW4 = Losu(W4);
+    WW5 = Losu(W5);
+    ListaTwarzy = W0.concat(WW1,WW2,WW3,WW4,WW5);
+    console.log(ListaTwarzy);
+}
+
+function Choice(x) {
+        // usuń zaznaczenie z wszystkich
+        ['t1','t2','t3'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('selected');
+        });
+        if (x === 0) {
+            choice = 0;
+            document.getElementById("dal").disabled = 1;
+            document.getElementById("dal").style.backgroundColor = "#e0e0e0";
+            return;
+        }
+        choice = x;
+        const sel = document.getElementById('t'+x);
+        if (sel) sel.classList.add('selected');
+        document.getElementById("dal").disabled = 0;
+        document.getElementById("dal").style.backgroundColor = "#4b78a6";
+}
+
+function Change() {
+    switch (stage) {
+        case 0:
+            document.getElementById("intro").innerHTML = `<h1> To jest rozgrzewka.<br><br>Za chwilę zobaczysz na ekranie twarz mężczyzny.<br><br>
+            Spróbuj ją zapamiętać. Masz na to 3 sekundy.<br></h1>`;
+            stage++;
+        break;
+        case 1:
+            c = true;
+            progress = 0;
+            document.getElementById("ttall").innerHTML = `<img src="{% static 'testimg/' %}${ListaTwarzy[progress].link}" alt="">`;
+            document.getElementById("paz").style.backgroundColor = "#e0e0e0";
+            document.getElementById("intro").style.display = "none";
+            document.getElementById("triple").style.display = "none";
+            document.getElementById("test").style.display = "inline";
+            document.getElementById("ttall").style.display = "inline";
+            document.getElementById("dal").textContent = "DALEJ";
+            document.getElementById("title").innerHTML = `Zaznacz tę twarz, którą widziałeś(-aś) przed chwilą, po czym naciśnij przycisk DALEJ.`;
+            document.getElementById("title").style.display = "none"
+            choice = 0;
+            progress++;
+            stage++;
+            choice = 0;
+            setTimeout(PostChange, 3000);
+        break;
+        case 2:
+            document.getElementById("title").style.display = "none"
+            document.getElementById("intro").style.display = "inline";
+            document.getElementById("triple").style.display = "none";
+            document.getElementById("ttall").style.display = "none";
+            document.getElementById("intro").innerHTML = `<h1> Teraz rozpocznie się właściwy test.<br><br>Zobaczysz 30 twarzy, które musisz rozpoznać.<br><br>
+            Każdą twarz zobaczysz przez 3 sekundy, a potem wybierz tą samą spośród 3 opcji.<br><br>Jeśli jesteś gotowy(-a), naciśnij przycisk DALEJ<br></h1>`;
+            stage++;
+            c = false;
+            Sec = 0;
+        break;
+        default:
+            if (stage < 33) {
+                PreChange();
+                c = true;
+                document.getElementById("paz").style.backgroundColor = "#e0e0e0";
+                stage++;
+            } else if (stage === 33) {
+                if (choice==Kolej) {Zapis_plec(); Zapis_wiek(); Zapis_etap(); wynik_ogolny++; console.log(wynik_ogolny)}
+                document.getElementById("intro").style.display = "inline";
+                document.getElementById("intro").innerHTML = `KONIEC TESTU<br>`
+                document.getElementById("test").style.display = "none";
+                document.getElementById("dal").textContent = "END";
+                c = false;
+                stage++
+            } else if (stage === 34) {
+                SaveResults();
+            }
+        break;
+    }
+}
+
+function PreChange() {
+    if (choice==Kolej) { if ((stage != 3)) {Zapis_plec(); Zapis_wiek(); Zapis_etap(); wynik_ogolny++; Licznik=0; c=false;}}
+    document.getElementById("dal").disabled = 1;
+    document.getElementById("dal").style.backgroundColor = "#e0e0e0";
+    document.getElementById("ttall").innerHTML = `<img src="{% static 'testimg/' %}${ListaTwarzy[progress].link}" alt="">`;
+    document.getElementById("title").style.display = "none"
+    document.getElementById("intro").style.display = "none";
+    document.getElementById("triple").style.display = "none";
+    document.getElementById("test").style.display = "inline";
+    document.getElementById("ttall").style.display = "inline"; 
+    progress++;
+    choice = 0;
+    setTimeout(PostChange, 3000);
+}
+
+function PostChange() {
+    c=true;
+    Choice(0);
+    Triada();
+    document.getElementById("dal").style.backgroundColor = "#4b78a6";
+    document.getElementById("title").style.display = "inline"
+    document.getElementById("intro").style.display = "none";
+    document.getElementById("triple").style.display = "flex";
+    document.getElementById("test").style.display = "inline";
+    document.getElementById("ttall").style.display = "none"; 
+}
+
+function Triada() {
+    Losu(Opcje);
+    Kolej = Random(1,3);
+    switch (Kolej) {
+        case 1:
+            document.getElementById("t1").innerHTML = `<img src="{% static 'testimg/' %}${ListaTwarzy[progress-1].link}" alt="">`;
+            document.getElementById("t2").innerHTML = `<img src="{% static 'testimg/' %}${Opcje[0]}test.png" alt="">`;
+            document.getElementById("t3").innerHTML = `<img src="{% static 'testimg/' %}${Opcje[1]}test.png" alt="">`;
+            break;
+        case 2:
+            document.getElementById("t1").innerHTML = `<img src="{% static 'testimg/' %}${Opcje[0]}test.png" alt="">`;
+            document.getElementById("t2").innerHTML = `<img src="{% static 'testimg/' %}${ListaTwarzy[progress-1].link}" alt="">`;
+            document.getElementById("t3").innerHTML = `<img src="{% static 'testimg/' %}${Opcje[1]}test.png" alt="">`;
+            break;
+        case 3:
+            document.getElementById("t1").innerHTML = `<img src="{% static 'testimg/' %}${Opcje[0]}test.png" alt="">`;
+            document.getElementById("t2").innerHTML = `<img src="{% static 'testimg/' %}${Opcje[1]}test.png" alt="">`;
+            document.getElementById("t3").innerHTML = `<img src="{% static 'testimg/' %}${ListaTwarzy[progress-1].link}" alt="">`;
+            break;
+    }
+}
+
+function Zapis_plec() {
+    if (ListaTwarzy[progress-1].plec == "F") {wynik_F++; czas_F+=Licznik;}
+    else if (ListaTwarzy[progress-1].plec == "M") {wynik_M++; czas_M+=Licznik;}
+}
+
+function Zapis_wiek() {
+    if (ListaTwarzy[progress-1].wiek == "1") {wynik_dzieci++; czas_dzieci+=Licznik;}
+    else if (ListaTwarzy[progress-1].wiek == "2") {wynik_sredni++; czas_sredni+=Licznik;}
+    else if (ListaTwarzy[progress-1].wiek == "3") {wynik_starszy++; czas_starszy+=Licznik;}
+}
+
+function Zapis_etap() {
+    if ((progress-1)<7) {wynik_1++; czas_1+=Licznik;}
+    else if ((progress-1)<13) {wynik_2++; czas_2+=Licznik;}
+    else if ((progress-1)<19) {wynik_3++; czas_3+=Licznik;}
+    else if ((progress-1)<25) {wynik_4++; czas_4+=Licznik;}
+    else {wynik_5++; czas_5+=Licznik;}
+}
+
+function Czas() {
+    if (c==true && !paused) {Sec++; Licznik++;}
+    dateeee.setSeconds(Sec);
+    timeString = dateeee.toISOString().substring(11, 19);
+    const timerEl = document.getElementById("timer");
+    if (timerEl) {
+        timerEl.textContent = timeString;
+    }
+}
+const Zegarek = setInterval(Czas, 1000)
+
+function Random(min, max) {
+    return Math.floor(Math.random() * (max - min + 1) ) + min;
+} 
+
+function Losu(array) {
+    var i = array.length,
+        j = 0,
+        temp;
+
+    while (i--) {
+        j = Math.floor(Math.random() * (i+1));
+        temp = array[i];
+        array[i] = array[j];
+        array[j] = temp;
+    }
+
+    return array;
+}
+
+function Powrot() {
+    if (confirm("Czy na pewno chcesz zakończyć test?")) {
+        window.location.href = '{% url "info" %}';
+    }
+}
+
+function stopTest() {
+    paused = true;
+    document.getElementById("pauseOverlay").style.display = "flex";
+    document.getElementById("paz").style.display = "none";
+    document.getElementById("wznów_btn").style.display = "none";
+}
+
+function resumeTest() {
+    paused = false;
+    document.getElementById("pauseOverlay").style.display = "none";
+    document.getElementById("paz").style.display = "inline";
+    document.getElementById("wznów_btn").style.display = "none";
+}
+
+function wznówTest() {
+    resumeTest();
+}
+
+function SaveResults() {
+    var wyniki = {
+        czas: timeString,
+        wynik_ogolny: wynik_ogolny,
+        wynik_1: wynik_1,
+        wynik_2: wynik_2,
+        wynik_3: wynik_3,
+        wynik_4: wynik_4,
+        wynik_5: wynik_5,
+        wynik_m: wynik_M,
+        wynik_k: wynik_F,
+        wynik_d: wynik_dzieci,
+        wynik_s: wynik_sredni,
+        wynik_p: wynik_starszy,
+        czas_1: czas_1,
+        czas_2: czas_2,
+        czas_3: czas_3,
+        czas_4: czas_4,
+        czas_5: czas_5,
+        czas_m: czas_M,
+        czas_k: czas_F,
+        czas_d: czas_dzieci,
+        czas_s: czas_sredni,
+        czas_p: czas_starszy
+    };
+    sessionStorage.setItem('wyniki', JSON.stringify(wyniki));
+    window.location.href = '{% url "info" %}';
+}
+
+</script>
+
+</html>

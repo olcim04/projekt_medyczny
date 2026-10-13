@@ -19,7 +19,7 @@ from django.urls import path
 from django.conf import settings
 from django.conf.urls.static import static
 from pathlib import Path
-from app.views import home, login_view, logout_view, info, wybierz_pacjenta, dodaj_pacjenta, aktualizuj_pacjenta, test, zapisz_wyniki, badanie_zapisz, badanie_wynik, get_pacjent_data, export_wyniki
+from app.views import home, login_view, logout_view, info, wybierz_pacjenta, dodaj_pacjenta, aktualizuj_pacjenta, test, test2, zapisz_wyniki, badanie_zapisz, badanie_wynik, get_pacjent_data, export_wyniki
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -34,6 +34,7 @@ urlpatterns = [
     path('info/dodaj_pacjenta/', dodaj_pacjenta, name='dodaj_pacjenta'),
     path('info/aktualizuj_pacjenta/', aktualizuj_pacjenta, name='aktualizuj_pacjenta'),
     path('info/test/', test, name='test'),
+    path('info/test2/', test2, name='test2'),
     path('info/test/zapisz/', zapisz_wyniki, name='zapisz_wyniki'),
     path('info/export/', export_wyniki, name='export_wyniki'),
     path('badanie/zapisz/', badanie_zapisz, name='badanie_zapisz'),

@@ -87,6 +87,8 @@ class Badanie(models.Model):
     wynik_r = models.DecimalField(db_column='wynik_R', max_digits=5, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
     wynik_g = models.DecimalField(db_column='wynik_G', max_digits=5, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
     wynik_b = models.DecimalField(db_column='wynik_B', max_digits=5, decimal_places=2, blank=True, null=True)  # Field name made lowercase.
+    wyniki_json = models.TextField(blank=True, null=True)
+    test_type = models.CharField(max_length=50, blank=True, null=True)
 
     class Meta:
         managed = False

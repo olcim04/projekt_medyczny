@@ -167,7 +167,24 @@ def get_pacjent_data(request, pacjent_id):
         from datetime import date
         wiek = date.today().year - pacjent.data_urodzenia.year - ((date.today().month, date.today().day) < (pacjent.data_urodzenia.month, pacjent.data_urodzenia.day))
         ostatnie_badanie = Badanie.objects.filter(id_pacjenta=pacjent).order_by('-data_badania', '-id_badania').first()
+        ostatnie_badanie_kolory = Badanie.objects.filter(id_pacjenta=pacjent, test_type='kolory').order_by('-data_badania', '-id_badania').first()
+        ostatnie_badanie_twarze = Badanie.objects.filter(id_pacjenta=pacjent, test_type='twarze').order_by('-data_badania', '-id_badania').first()
         plec_map = {'M': 'Mężczyzna', 'K': 'Kobieta', 'Inna': 'Inna'}
+
+        def badanie_to_dict(badanie):
+            if not badanie:
+                return None
+            return {
+                'wynik_r': badanie.wynik_r,
+                'wynik_g': badanie.wynik_g,
+                'wynik_b': badanie.wynik_b,
+                'wynik_ogolny': badanie.wynik_ogolny,
+                'czas_trwania': str(badanie.czas_trwania),
+                'data_badania': str(badanie.data_badania),
+                'test_type': badanie.test_type,
+                'wyniki_json': json.loads(badanie.wyniki_json) if badanie.wyniki_json else None,
+            }
+
         data = {
             'imie': pacjent.imie,
             'nazwisko': pacjent.nazwisko,
@@ -178,14 +195,9 @@ def get_pacjent_data(request, pacjent_id):
             'nazwa_dokumentu': pacjent.nazwa_dokumentu,
             'numer_dokumentu': pacjent.numer_dokumentu,
             'mial_badanie': ostatnie_badanie is not None,
-            'ostatnie_badanie': {
-                'wynik_r': ostatnie_badanie.wynik_r if ostatnie_badanie else None,
-                'wynik_g': ostatnie_badanie.wynik_g if ostatnie_badanie else None,
-                'wynik_b': ostatnie_badanie.wynik_b if ostatnie_badanie else None,
-                'wynik_ogolny': ostatnie_badanie.wynik_ogolny if ostatnie_badanie else None,
-                'czas_trwania': str(ostatnie_badanie.czas_trwania) if ostatnie_badanie else None,
-                'data_badania': str(ostatnie_badanie.data_badania) if ostatnie_badanie else None,
-            } if ostatnie_badanie else None
+            'ostatnie_badanie': badanie_to_dict(ostatnie_badanie) if ostatnie_badanie else None,
+            'ostatnie_badanie_kolory': badanie_to_dict(ostatnie_badanie_kolory),
+            'ostatnie_badanie_twarze': badanie_to_dict(ostatnie_badanie_twarze),
         }
         return JsonResponse(data)
     except Pacjent.DoesNotExist:
@@ -261,6 +273,13 @@ def test(request):
         messages.error(request, 'Najpierw wybierz pacjenta')
         return redirect('info')
     return render(request, 'test.html')
+
+@login_required
+def test2(request):
+    if not request.session.get('wybrany_pacjent'):
+        messages.error(request, 'Najpierw wybierz pacjenta')
+        return redirect('info')
+    return render(request, 'test2.html')
 
 @login_required
 def aktualizuj_pacjenta(request):
@@ -339,16 +358,25 @@ def zapisz_wyniki(request):
             return JsonResponse({'error': 'Brak wybranego pacjenta'}, status=400)
         pacjent = Pacjent.objects.get(id_pacjenta=pacjent_id)
         prowadzacy = Uzytkownik.objects.get(id_uzytkownika=request.user.id)
-        Badanie.objects.create(
-            id_pacjenta=pacjent,
-            id_prowadzacego=prowadzacy,
-            data_badania=timezone.now().date(),
-            czas_trwania=data['czas'],
-            wynik_ogolny=data['wynik_ogolny'],
-            wynik_r=data['wynik_r'],
-            wynik_g=data['wynik_g'],
-            wynik_b=data['wynik_b']
-        )
+        # Przyjmujemy dwa formaty wynikow: test kolorow (wynik_r/g/b) albo test twarzy (zlozony obiekt)
+        kwargs = {
+            'id_pacjenta': pacjent,
+            'id_prowadzacego': prowadzacy,
+            'data_badania': timezone.now().date(),
+            'czas_trwania': data.get('czas', '00:00:00'),
+            'wynik_ogolny': data.get('wynik_ogolny')
+        }
+        if 'wynik_r' in data or 'wynik_g' in data or 'wynik_b' in data:
+            kwargs['wynik_r'] = data.get('wynik_r')
+            kwargs['wynik_g'] = data.get('wynik_g')
+            kwargs['wynik_b'] = data.get('wynik_b')
+            kwargs['test_type'] = 'kolory'
+        else:
+            # Zapisz pełny obiekt wyników do kolumny wyniki_json
+            kwargs['wyniki_json'] = json.dumps(data, ensure_ascii=False)
+            kwargs['test_type'] = 'twarze'
+
+        Badanie.objects.create(**kwargs)
         return JsonResponse({'success': True})
     return JsonResponse({'error': 'Invalid method'}, status=405)
 
@@ -378,17 +406,62 @@ def export_wyniki(request):
     if test_name:
         rows.append(['Wybrany test', test_name])
     rows.append([])
-    rows.append(['Data badania', 'Czas trwania', 'Wynik ogólny', 'Wynik R', 'Wynik G', 'Wynik B'])
 
-    for badanie in badania:
-        rows.append([
-            badanie.data_badania.strftime('%Y-%m-%d'),
-            str(badanie.czas_trwania),
-            float(badanie.wynik_ogolny) if badanie.wynik_ogolny is not None else '',
-            float(badanie.wynik_r) if badanie.wynik_r is not None else '',
-            float(badanie.wynik_g) if badanie.wynik_g is not None else '',
-            float(badanie.wynik_b) if badanie.wynik_b is not None else '',
-        ])
+    # Decide export format based on test_name
+    tn = test_name.lower()
+    is_face = 'twar' in tn or 'face' in tn
+    is_color = 'kolor' in tn or 'color' in tn
+
+    if is_face:
+        headers = ['Data badania', 'Czas trwania', 'Wynik ogólny', 'Mężczyźni', 'Kobiety', 'Dzieci', 'Średni wiek', 'Podeszły wiek', 'Etap1', 'Etap2', 'Etap3', 'Etap4', 'Etap5']
+        rows.append(headers)
+        for badanie in badania.filter(test_type='twarze'):
+            # prefer wyniki_json, fallback to field mapping
+            data = {}
+            if badanie.wyniki_json:
+                try:
+                    data = json.loads(badanie.wyniki_json)
+                except Exception:
+                    data = {}
+            rows.append([
+                badanie.data_badania.strftime('%Y-%m-%d'),
+                str(badanie.czas_trwania),
+                data.get('wynik_ogolny', badanie.wynik_ogolny if badanie.wynik_ogolny is not None else ''),
+                data.get('wynik_m', ''),
+                data.get('wynik_k', ''),
+                data.get('wynik_d', ''),
+                data.get('wynik_s', ''),
+                data.get('wynik_p', ''),
+                data.get('wynik_1', ''),
+                data.get('wynik_2', ''),
+                data.get('wynik_3', ''),
+                data.get('wynik_4', ''),
+                data.get('wynik_5', ''),
+            ])
+    elif is_color:
+        headers = ['Data badania', 'Czas trwania', 'Wynik ogólny', 'Wynik R', 'Wynik G', 'Wynik B']
+        rows.append(headers)
+        for badanie in badania.filter(test_type='kolory'):
+            rows.append([
+                badanie.data_badania.strftime('%Y-%m-%d'),
+                str(badanie.czas_trwania),
+                float(badanie.wynik_ogolny) if badanie.wynik_ogolny is not None else '',
+                float(badanie.wynik_r) if badanie.wynik_r is not None else '',
+                float(badanie.wynik_g) if badanie.wynik_g is not None else '',
+                float(badanie.wynik_b) if badanie.wynik_b is not None else '',
+            ])
+    else:
+        # Default: include all with general columns and JSON if present
+        headers = ['Data badania', 'Czas trwania', 'Wynik ogólny', 'Typ testu', 'Dane JSON']
+        rows.append(headers)
+        for badanie in badania:
+            rows.append([
+                badanie.data_badania.strftime('%Y-%m-%d'),
+                str(badanie.czas_trwania),
+                float(badanie.wynik_ogolny) if badanie.wynik_ogolny is not None else '',
+                badanie.test_type or '',
+                badanie.wyniki_json or ''
+            ])
 
     output = _build_xlsx_package(rows, sheet_name='Wyniki')
     filename = f"wyniki_{pacjent.imie}_{pacjent.nazwisko}.xlsx"
