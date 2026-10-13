@@ -58,7 +58,61 @@
     </div>
 </body>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+<script src="{% static 'js/mqtt-joystick.js' %}"></script>
 <script>
+
+let joystickMode = false;
+let joystickSelection = 2;
+
+function setupJoystickForFaceTest() {
+    if (!window.MQTTJoystick) {
+        return;
+    }
+
+    const controller = window.MQTTJoystick.init({
+        enabled: true,
+        host: 'localhost',
+        port: 9001,
+        path: '/mqtt',
+        topic: 'test/joystick',
+        username: '',
+        password: '',
+        reconnectTimeout: 5000,
+        simulateKeyboard: false,
+    }, function (value) {
+        if (value === undefined || value === null) return;
+
+        joystickMode = true;
+
+        if (value === -1) {
+            joystickSelection = Math.max(1, joystickSelection - 1);
+            Choice(joystickSelection);
+            return;
+        }
+
+        if (value === 1) {
+            joystickSelection = Math.min(3, joystickSelection + 1);
+            Choice(joystickSelection);
+            return;
+        }
+
+        if (value === 0) {
+            joystickSelection = 2;
+            Choice(joystickSelection);
+            return;
+        }
+
+        if (value === 2) {
+            Choice(joystickSelection);
+            if (typeof Change === 'function') {
+                Change();
+            }
+        }
+    });
+
+    window.__faceJoystickController = controller;
+}
 
 function Twarz(plec, wiek, kat, bonus, link) {
     this.plec = plec;
@@ -134,6 +188,8 @@ function Setup(){
     choice = 0;
     c = false;
     progress = 0;
+    joystickMode = false;
+    joystickSelection = 2;
     WW1 = Losu(W1);
     WW2 = Losu(W2);
     WW3 = Losu(W3);
@@ -141,6 +197,7 @@ function Setup(){
     WW5 = Losu(W5);
     ListaTwarzy = W0.concat(WW1,WW2,WW3,WW4,WW5);
     console.log(ListaTwarzy);
+    setupJoystickForFaceTest();
 }
 
 function Choice(x) {
@@ -179,7 +236,7 @@ function Change() {
             document.getElementById("test").style.display = "inline";
             document.getElementById("ttall").style.display = "inline";
             document.getElementById("dal").textContent = "DALEJ";
-            document.getElementById("title").innerHTML = `Zaznacz tę twarz, którą widziałeś(-aś) przed chwilą, po czym naciśnij przycisk DALEJ.`;
+            document.getElementById("title").innerHTML = `A teraz zaznacz tę twarz, którą widziałeś(-aś) przed chwilą, po czym naciśnij przycisk DALEJ.`;
             document.getElementById("title").style.display = "none"
             choice = 0;
             progress++;
@@ -298,6 +355,25 @@ function Czas() {
 }
 const Zegarek = setInterval(Czas, 1000)
 
+const PREVIEW_SECONDS_PER_FACE = 3;
+const PREVIEW_FACE_COUNT = 30;
+const PREVIEW_TIME_TOTAL_SECONDS = PREVIEW_SECONDS_PER_FACE * PREVIEW_FACE_COUNT;
+
+function getSecondsFromTimeString(value) {
+    if (!value || typeof value !== 'string') return 0;
+    const parts = value.split(':').map(Number);
+    if (parts.length !== 3 || parts.some(Number.isNaN)) return 0;
+    return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+}
+
+function formatSecondsToTimeString(totalSeconds) {
+    const safeSeconds = Math.max(0, Math.floor(totalSeconds));
+    const hours = String(Math.floor(safeSeconds / 3600)).padStart(2, '0');
+    const minutes = String(Math.floor((safeSeconds % 3600) / 60)).padStart(2, '0');
+    const seconds = String(safeSeconds % 60).padStart(2, '0');
+    return `${hours}:${minutes}:${seconds}`;
+}
+
 function Random(min, max) {
     return Math.floor(Math.random() * (max - min + 1) ) + min;
 } 
@@ -342,8 +418,12 @@ function wznówTest() {
 }
 
 function SaveResults() {
+    const totalSeconds = getSecondsFromTimeString(timeString);
+    const adjustedSeconds = Math.max(0, totalSeconds - PREVIEW_TIME_TOTAL_SECONDS);
+    const adjustedTimeString = formatSecondsToTimeString(adjustedSeconds);
+
     var wyniki = {
-        czas: timeString,
+        czas: adjustedTimeString,
         wynik_ogolny: wynik_ogolny,
         wynik_1: wynik_1,
         wynik_2: wynik_2,

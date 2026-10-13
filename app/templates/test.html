@@ -40,6 +40,7 @@
                 Ten test sprawdza, jak rozpoznajesz kolory.<br>Na ekranie są dwa kwadraty.<br>
                 Za pomocą suwaka zmień kolor prawego kwadratu,<br> żeby był taki sam jak kwadrat po lewej.<br>
                 Jeśli jesteś gotowy(-a), naciśnij przycisk START.<br>
+                W trybie testowym możesz też użyć klawiszy strzałek: lewo/prawo = -1/1, góra = 2, dół = 0.<br>
             </h1>
         </div>
          
@@ -56,7 +57,73 @@
     </div>
 </body>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+<script src="{% static 'js/mqtt-joystick.js' %}"></script>
 <script>
+        function applyJoystickMove(direction) {
+            const picker = document.getElementById('picker');
+            if (!picker) return;
+
+            const currentValue = Number(picker.value || 50);
+            const step = 5;
+            const nextValue = Math.min(90, Math.max(10, currentValue + (direction * step)));
+            picker.value = String(nextValue);
+            Match();
+        }
+
+        function resetJoystickToCenter() {
+            const picker = document.getElementById('picker');
+            if (!picker) return;
+            picker.value = '50';
+            Match();
+        }
+
+        function initMqttJoystick() {
+            if (!window.MQTTJoystick) {
+                console.warn('MQTT joystick script not loaded.');
+                return;
+            }
+
+            window.__mqttJoystick = window.MQTTJoystick.init({
+                enabled: true,
+                host: 'localhost',
+                port: 9001,
+                path: '/mqtt',
+                topic: 'test/joystick',
+                username: '',
+                password: '',
+                reconnectTimeout: 5000,
+                simulateKeyboard: true,
+            }, function (value) {
+                switch (value) {
+                    case -1:
+                        applyJoystickMove(-1);
+                        break;
+                    case 0:
+                        resetJoystickToCenter();
+                        break;
+                    case 1:
+                        applyJoystickMove(1);
+                        break;
+                    case 2:
+                        if (typeof Change === 'function') {
+                            Change();
+                        }
+                        break;
+                    default:
+                        break;
+                }
+            });
+
+            window.mqttJoystickDebug = {
+                left: () => window.MQTTJoystick.send(-1),
+                right: () => window.MQTTJoystick.send(1),
+                center: () => window.MQTTJoystick.send(0),
+                next: () => window.MQTTJoystick.send(2),
+            };
+            console.log('MQTT joystick debug enabled. Try: mqttJoystickDebug.left(), mqttJoystickDebug.right(), mqttJoystickDebug.center(), mqttJoystickDebug.next()');
+        }
+
         let L = 50;
         let stage = 0;
         let R = 0;
@@ -73,6 +140,7 @@
         let timeString = '00:00:00';
     function Setup(){
         Losu(Pula);
+        initMqttJoystick();
     }
     function Match() {
         L = document.getElementById("picker").value;
