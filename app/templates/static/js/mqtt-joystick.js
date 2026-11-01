@@ -87,6 +87,9 @@
                         client.subscribe(settings.topic);
                         console.log('MQTT joystick subscribed to:', settings.topic);
                     },
+                    onFailure: function (responseObject) {
+                        console.error('MQTT connection failed:', responseObject && responseObject.errorMessage ? responseObject.errorMessage : 'unknown');
+                    },
                     userName: settings.username || undefined,
                     password: settings.password || undefined,
                     reconnect: true,

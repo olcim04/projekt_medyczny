@@ -72,7 +72,7 @@ function setupJoystickForFaceTest() {
 
     const controller = window.MQTTJoystick.init({
         enabled: true,
-        host: 'localhost',
+        host: window.MQTT_BROKER_HOST || window.location.hostname || 'localhost',
         port: 9001,
         path: '/mqtt',
         topic: 'test/joystick',
