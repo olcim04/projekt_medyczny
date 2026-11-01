@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,12 +22,25 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-4qo0_4(tm=h5sd14sir4r22na0aa-7!jia+4k11-g@+vrrlw7@'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-4qo0_4(tm=h5sd14sir4r22na0aa-7!jia+4k11-g@+vrrlw7@')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'true').strip().lower() in {'1', 'true', 'yes', 'on'}
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver']
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get('DJANGO_ALLOWED_HOSTS', '127.0.0.1,localhost,testserver').split(',')
+    if host.strip()
+]
+
+if not DEBUG:
+    required_environment = ('DJANGO_SECRET_KEY', 'DJANGO_ALLOWED_HOSTS', 'DB_PASSWORD')
+    missing_environment = [name for name in required_environment if not os.environ.get(name)]
+    if missing_environment:
+        raise ImproperlyConfigured(
+            'Set these environment variables when DJANGO_DEBUG is disabled: '
+            + ', '.join(missing_environment)
+        )
 
 
 # Application definition
@@ -76,12 +90,12 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'projekt_medyczny',
-        'USER': 'root',
-        'PASSWORD': 'domiolik2',
-        'HOST': 'localhost',
-        'PORT': '3306',
+        'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.mysql'),
+        'NAME': os.environ.get('DB_NAME', 'projekt_medyczny'),
+        'USER': os.environ.get('DB_USER', 'root'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'domiolik2'),
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
+        'PORT': os.environ.get('DB_PORT', '3306'),
     }
 }
 
@@ -138,7 +152,13 @@ LOGIN_REDIRECT_URL = '/info/'
 LOGOUT_REDIRECT_URL = '/login/'
 
 # CSRF / cookies (local development)
-CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1', 'http://localhost']
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        'CSRF_TRUSTED_ORIGINS', 'http://127.0.0.1,http://localhost'
+    ).split(',')
+    if origin.strip()
+]
 CSRF_COOKIE_SECURE = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_HTTPONLY = False
