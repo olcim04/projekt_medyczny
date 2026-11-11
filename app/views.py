@@ -1,3 +1,7 @@
+import re
+from pathlib import Path
+
+from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
@@ -9,6 +13,87 @@ from io import BytesIO
 import json
 import zipfile
 from xml.sax.saxutils import escape
+
+
+_FACE_TEST_EXTRA_IMAGES = {
+    'k40.3': {'k40_3.1.png'},
+    'm18.4': {'m18.4.1.png'},
+}
+
+
+def _build_face_test_trials(image_root=None):
+    if image_root is None:
+        if not settings.STATICFILES_DIRS:
+            raise ValueError('Brak skonfigurowanego katalogu plików statycznych.')
+        image_root = Path(settings.STATICFILES_DIRS[0]) / 'testimg'
+    else:
+        image_root = Path(image_root)
+
+    if not image_root.is_dir():
+        raise ValueError(f'Nie znaleziono katalogu zdjęć testowych: {image_root}')
+
+    trials_by_set = {}
+    folder_pattern = re.compile(r'(?P<gender>[mk])(?P<age>\d+)(?:\.(?P<set>\d+))?')
+
+    for folder in image_root.iterdir():
+        if not folder.is_dir():
+            continue
+
+        match = folder_pattern.fullmatch(folder.name)
+        if not match:
+            continue
+
+        set_suffix = match.group('set')
+        if set_suffix == '1':
+            continue
+
+        set_number = int(set_suffix) if set_suffix else 1
+        if set_number > 5:
+            raise ValueError(f'Nieobsługiwany numer zestawu zdjęć: {folder.name}')
+
+        gender = 'M' if match.group('gender') == 'm' else 'F'
+        age = match.group('age')
+        if folder.name == 'm30.4':
+            age = '40'
+
+        age_group = {'18': '1', '40': '2', '70': '3', '75': '3'}.get(age)
+        if age_group is None:
+            raise ValueError(f'Nieobsługiwana kategoria wieku w folderze: {folder.name}')
+
+        excluded_images = _FACE_TEST_EXTRA_IMAGES.get(folder.name, set())
+        image_files = sorted(
+            image.name for image in folder.iterdir()
+            if image.is_file()
+            and image.suffix.lower() == '.png'
+            and image.name not in excluded_images
+        )
+        if len(image_files) != 3:
+            raise ValueError(
+                f'Folder {folder.name} musi zawierać 3 zdjęcia testowe; '
+                f'znaleziono {len(image_files)}.'
+            )
+
+        trial = {
+            'gender': gender,
+            'age_group': age_group,
+            'set_number': set_number,
+            'images': [f'{folder.name}/{image_name}' for image_name in image_files],
+        }
+        trials_by_set.setdefault(set_number, []).append(trial)
+
+    trials = []
+    for set_number in range(1, 6):
+        set_trials = trials_by_set.get(set_number, [])
+        categories = {(trial['gender'], trial['age_group']) for trial in set_trials}
+        if len(set_trials) != 6 or len(categories) != 6:
+            raise ValueError(
+                f'Zestaw {set_number} musi zawierać po jednym folderze dla '
+                '6 kategorii płci i wieku.'
+            )
+        trials.extend(sorted(set_trials, key=lambda trial: (trial['gender'], trial['age_group'])))
+
+    return trials
+
 
 def home(request):
     if request.user.is_authenticated:
@@ -279,7 +364,12 @@ def test2(request):
     if not request.session.get('wybrany_pacjent'):
         messages.error(request, 'Najpierw wybierz pacjenta')
         return redirect('info')
-    return render(request, 'test2.html')
+    try:
+        face_trials = _build_face_test_trials()
+    except ValueError as error:
+        messages.error(request, f'Nie można uruchomić testu twarzy: {error}')
+        return redirect('info')
+    return render(request, 'test2.html', {'face_trials': face_trials})
 
 @login_required
 def aktualizuj_pacjenta(request):

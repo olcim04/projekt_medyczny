@@ -1,8 +1,7 @@
 -- ===============================================
 -- UTWORZENIE BAZY DANYCH
 -- ===============================================
-DROP DATABASE IF EXISTS projekt_medyczny;
-CREATE DATABASE projekt_medyczny
+CREATE DATABASE IF NOT EXISTS projekt_medyczny
 CHARACTER SET utf8mb4
 COLLATE utf8mb4_polish_ci;
 
@@ -11,8 +10,7 @@ USE projekt_medyczny;
 -- ===============================================
 -- TABELA: UŻYTKOWNIK
 -- ===============================================
-DROP TABLE IF EXISTS UZYTKOWNIK;
-CREATE TABLE UZYTKOWNIK (
+CREATE TABLE IF NOT EXISTS UZYTKOWNIK (
     id_uzytkownika INT AUTO_INCREMENT PRIMARY KEY,
     imie VARCHAR(50) NOT NULL,
     nazwisko VARCHAR(50) NOT NULL,
@@ -22,8 +20,7 @@ CREATE TABLE UZYTKOWNIK (
 -- ===============================================
 -- TABELA: PACJENT
 -- ===============================================
-DROP TABLE IF EXISTS PACJENT;
-CREATE TABLE PACJENT (
+CREATE TABLE IF NOT EXISTS PACJENT (
     id_pacjenta INT AUTO_INCREMENT PRIMARY KEY,
     imie VARCHAR(50) NOT NULL,
     nazwisko VARCHAR(50) NOT NULL,
@@ -39,8 +36,7 @@ CREATE TABLE PACJENT (
 -- ===============================================
 -- TABELA: BADANIE
 -- ===============================================
-DROP TABLE IF EXISTS BADANIE;
-CREATE TABLE BADANIE (
+CREATE TABLE IF NOT EXISTS BADANIE (
     id_badania INT AUTO_INCREMENT PRIMARY KEY,
     id_pacjenta INT NOT NULL,
     id_prowadzacego INT NOT NULL,
@@ -62,8 +58,7 @@ CREATE TABLE BADANIE (
 -- ===============================================
 -- DODATKOWA INFORMACJA O JEDNOSTKACH WYNIKÓW
 -- ===============================================
-DROP TABLE IF EXISTS USTAWIENIA_SYSTEMU;
-CREATE TABLE USTAWIENIA_SYSTEMU (
+CREATE TABLE IF NOT EXISTS USTAWIENIA_SYSTEMU (
     id_ustawienia INT AUTO_INCREMENT PRIMARY KEY,
     klucz VARCHAR(50) UNIQUE NOT NULL,
     wartosc VARCHAR(100) NOT NULL
@@ -71,4 +66,5 @@ CREATE TABLE USTAWIENIA_SYSTEMU (
 
 -- Wstawienie informacji o jednostce wyników
 INSERT INTO USTAWIENIA_SYSTEMU (klucz, wartosc)
-VALUES ('jednostka_wynikow', 'procent');
+VALUES ('jednostka_wynikow', 'procent')
+ON DUPLICATE KEY UPDATE wartosc = USTAWIENIA_SYSTEMU.wartosc;
