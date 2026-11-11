@@ -21,7 +21,7 @@ _FACE_TEST_EXTRA_IMAGES = {
 }
 
 
-def _build_face_test_trials(image_root=None):
+def _build_face_test_data(image_root=None):
     if image_root is None:
         if not settings.STATICFILES_DIRS:
             raise ValueError('Brak skonfigurowanego katalogu plików statycznych.')
@@ -33,6 +33,7 @@ def _build_face_test_trials(image_root=None):
         raise ValueError(f'Nie znaleziono katalogu zdjęć testowych: {image_root}')
 
     trials_by_set = {}
+    warmup_trials = []
     folder_pattern = re.compile(r'(?P<gender>[mk])(?P<age>\d+)(?:\.(?P<set>\d+))?')
 
     for folder in image_root.iterdir():
@@ -45,6 +46,16 @@ def _build_face_test_trials(image_root=None):
 
         set_suffix = match.group('set')
         if set_suffix == '1':
+            image_files = sorted(
+                image.name for image in folder.iterdir()
+                if image.is_file() and image.suffix.lower() == '.png'
+            )
+            if len(image_files) != 3:
+                raise ValueError(
+                    f'Folder {folder.name} musi zawierać 3 zdjęcia do rozgrzewki; '
+                    f'znaleziono {len(image_files)}.'
+                )
+            warmup_trials.append([f'{folder.name}/{image_name}' for image_name in image_files])
             continue
 
         set_number = int(set_suffix) if set_suffix else 1
@@ -92,7 +103,10 @@ def _build_face_test_trials(image_root=None):
             )
         trials.extend(sorted(set_trials, key=lambda trial: (trial['gender'], trial['age_group'])))
 
-    return trials
+    if not warmup_trials:
+        raise ValueError('Brak folderu .1 ze zdjęciami do rozgrzewki.')
+
+    return {'trials': trials, 'warmup_trials': warmup_trials}
 
 
 def home(request):
@@ -365,11 +379,14 @@ def test2(request):
         messages.error(request, 'Najpierw wybierz pacjenta')
         return redirect('info')
     try:
-        face_trials = _build_face_test_trials()
+        face_test_data = _build_face_test_data()
     except ValueError as error:
         messages.error(request, f'Nie można uruchomić testu twarzy: {error}')
         return redirect('info')
-    return render(request, 'test2.html', {'face_trials': face_trials})
+    return render(request, 'test2.html', {
+        'face_trials': face_test_data['trials'],
+        'face_warmup_trials': face_test_data['warmup_trials'],
+    })
 
 @login_required
 def aktualizuj_pacjenta(request):
