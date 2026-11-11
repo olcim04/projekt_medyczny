@@ -3,7 +3,7 @@ from tempfile import TemporaryDirectory
 
 from django.test import SimpleTestCase
 
-from app.views import _build_face_test_trials
+from app.views import _build_face_test_data
 
 
 class FaceTestImageTests(SimpleTestCase):
@@ -36,11 +36,15 @@ class FaceTestImageTests(SimpleTestCase):
             (wrong_set / f'wrong{index}.png').touch()
 
     def test_builds_five_six_trial_sets_and_omits_invalid_images(self):
-        trials = _build_face_test_trials(self.image_root)
+        face_test_data = _build_face_test_data(self.image_root)
+        trials = face_test_data['trials']
 
         self.assertEqual(len(trials), 30)
         self.assertEqual({trial['set_number'] for trial in trials}, {1, 2, 3, 4, 5})
         self.assertTrue(all(len(trial['images']) == 3 for trial in trials))
+        self.assertEqual(len(face_test_data['warmup_trials']), 1)
+        self.assertEqual(len(face_test_data['warmup_trials'][0]), 3)
+        self.assertTrue(all(image.startswith('k18.1/') for image in face_test_data['warmup_trials'][0]))
         self.assertFalse(any(image.startswith('k18.1/') for trial in trials for image in trial['images']))
         self.assertFalse(any(image.endswith('k40_3.1.png') for trial in trials for image in trial['images']))
         self.assertFalse(any(image.endswith('m18.4.1.png') for trial in trials for image in trial['images']))
@@ -56,4 +60,4 @@ class FaceTestImageTests(SimpleTestCase):
         (folder / 'face3.png').unlink()
 
         with self.assertRaisesRegex(ValueError, 'm18.2 musi zawierać 3 zdjęcia'):
-            _build_face_test_trials(self.image_root)
+            _build_face_test_data(self.image_root)

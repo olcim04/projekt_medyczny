@@ -9,10 +9,10 @@
         /* Layout dla trzech opcji - obok siebie */
         #triple { display:flex; gap:12px; justify-content:center; align-items:center; }
         .tri { width:30%; border:2px solid #e0e0e0; padding:8px; box-sizing:border-box; cursor:pointer; display:flex; align-items:center; justify-content:center; border-radius:6px; background:#fff; }
-        .tri img { width:100%; max-width:100%; height:auto; display:block; }
+        .tri img { width:100%; max-width:100%; aspect-ratio:1 / 1; height:auto; object-fit:contain; display:block; }
         .tri.selected { border-color:#4b78a6; box-shadow:0 4px 12px rgba(75,120,166,0.18); }
         #ttall { width:calc(30% - 20px); margin:0 auto; }
-        #ttall img { width:calc(100% - 1px); max-width:100%; height:auto; display:block; margin:0 auto; }
+        #ttall img { width:calc(100% - 1px); max-width:100%; aspect-ratio:1 / 1; height:auto; object-fit:contain; display:block; margin:0 auto; }
         #test { text-align:center; }
     </style>
     <title>Test Twarzy</title>
@@ -62,6 +62,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
 <script src="{% static 'js/mqtt-joystick.js' %}"></script>
 {{ face_trials|json_script:"face-test-trials" }}
+{{ face_warmup_trials|json_script:"face-test-warmup-trials" }}
 <script>
 
 const FACE_IMAGE_BASE = "{% static 'testimg/' %}";
@@ -136,7 +137,6 @@ let ListaTwarzy = [];
 var [wynik_1,wynik_2,wynik_3,wynik_4,wynik_5,wynik_M,wynik_F,wynik_dzieci,wynik_sredni,wynik_starszy,wynik_ogolny] = [0,0,0,0,0,0,0,0,0,0,0];
 let Kolej;
 var [czas_1,czas_2,czas_3,czas_4,czas_5,czas_M,czas_F,czas_dzieci,czas_sredni,czas_starszy,czas_ogolny] = [0,0,0,0,0,0,0,0,0,0,0];
-let Opcje = [1,2,3,4,5,6,7];
 let progress = 0;
 let Wynik = 0;
 var timeString = '00:00:00';
@@ -155,8 +155,10 @@ function Setup(){
     joystickMode = false;
     joystickSelection = 2;
     const faceTrials = JSON.parse(document.getElementById('face-test-trials').textContent);
+    const warmupTrials = JSON.parse(document.getElementById('face-test-warmup-trials').textContent);
+    const warmupImages = warmupTrials[Random(0, warmupTrials.length - 1)];
     ListaTwarzy = [
-        { plec: "M", wiek: "1", set: 0, warmup: true, link: "w0.png" },
+        { set: 0, warmup: true, images: warmupImages },
         ...[1, 2, 3, 4, 5].flatMap(setNumber => {
             const setTrials = faceTrials
                 .filter(trial => trial.set_number === setNumber)
@@ -201,7 +203,8 @@ function Change() {
         case 1:
             c = true;
             progress = 0;
-            document.getElementById("ttall").innerHTML = `<img src="${FACE_IMAGE_BASE}${ListaTwarzy[progress].link}" alt="">`;
+            PrepareTrial(ListaTwarzy[progress]);
+            document.getElementById("ttall").innerHTML = `<img src="${FACE_IMAGE_BASE}${ListaTwarzy[progress].previewImage}" alt="">`;
             document.getElementById("paz").style.backgroundColor = "#e0e0e0";
             document.getElementById("intro").style.display = "none";
             document.getElementById("triple").style.display = "none";
@@ -254,15 +257,10 @@ function PreChange() {
     if (!trial) {
         throw new Error("Brak kolejnej próby w teście twarzy.");
     }
-    if (!trial.warmup) {
-        trial.options = Losu(trial.images.slice());
-        trial.previewImage = trial.options[Random(0, 2)];
-        trial.correctChoice = trial.options.indexOf(trial.previewImage) + 1;
-    }
+    PrepareTrial(trial);
     document.getElementById("dal").disabled = 1;
     document.getElementById("dal").style.backgroundColor = "#e0e0e0";
-    const previewImage = trial.warmup ? trial.link : trial.previewImage;
-    document.getElementById("ttall").innerHTML = `<img src="${FACE_IMAGE_BASE}${previewImage}" alt="">`;
+    document.getElementById("ttall").innerHTML = `<img src="${FACE_IMAGE_BASE}${trial.previewImage}" alt="">`;
     document.getElementById("title").style.display = "none"
     document.getElementById("intro").style.display = "none";
     document.getElementById("triple").style.display = "none";
@@ -288,19 +286,18 @@ function PostChange() {
 
 function Triada() {
     const trial = ListaTwarzy[progress - 1];
-    let options;
-    if (trial.warmup) {
-        options = Losu(Opcje.slice(0)).slice(0, 2).map(option => `${option}test.png`);
-        Kolej = Random(1, 3);
-        options.splice(Kolej - 1, 0, trial.link);
-    } else {
-        options = trial.options;
-        Kolej = trial.correctChoice;
-    }
+    const options = trial.options;
+    Kolej = trial.correctChoice;
     ['t1', 't2', 't3'].forEach((id, index) => {
         document.getElementById(id).innerHTML =
             `<img src="${FACE_IMAGE_BASE}${options[index]}" alt="Opcja ${index + 1}">`;
     });
+}
+
+function PrepareTrial(trial) {
+    trial.options = Losu(trial.images.slice());
+    trial.previewImage = trial.options[Random(0, 2)];
+    trial.correctChoice = trial.options.indexOf(trial.previewImage) + 1;
 }
 
 function Zapis_plec() {
