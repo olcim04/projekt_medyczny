@@ -110,7 +110,7 @@
                     <div id="face_results" style="display:none;">
                         <div id="face_overall">Prawidłowe odpowiedzi: -/30<br><br></div>
                         <div id="face_gender">Mężczyźni: - | Kobiety: -<br><br></div>
-                        <div id="face_age">Dzieci: - | Średni wiek: - | Podeszły wiek: -<br><br></div>
+                        <div id="face_age">Osoby młode: - | Średni wiek: - | Podeszły wiek: -<br><br></div>
                         <div id="face_stages">Etap 1: - | Etap 2: - | Etap 3: - | Etap 4: - | Etap 5: -<br><br></div>
                         <div id="face_time">Czas badania: -</div>
                     </div>
@@ -459,7 +459,7 @@ function loadPendingTestResults() {
             document.getElementById('test_kolorow').textContent = 'Wyniki zakończonego testu twarzy:';
             document.getElementById('face_overall').innerHTML = `Prawidłowe odpowiedzi: ${w.wynik_ogolny || '-'} /30<br><br>`;
             document.getElementById('face_gender').innerHTML = `Mężczyźni: ${w.wynik_m || '-'} | Kobiety: ${w.wynik_k || '-'}<br><br>`;
-            document.getElementById('face_age').innerHTML = `Dzieci: ${w.wynik_d || '-'} | Średni wiek: ${w.wynik_s || '-'} | Podeszły wiek: ${w.wynik_p || '-'}<br><br>`;
+            document.getElementById('face_age').innerHTML = `Osoby młode: ${w.wynik_d || '-'} | Średni wiek: ${w.wynik_s || '-'} | Podeszły wiek: ${w.wynik_p || '-'}<br><br>`;
             document.getElementById('face_stages').innerHTML = `Etap 1: ${w.wynik_1 || '-'} | Etap 2: ${w.wynik_2 || '-'} | Etap 3: ${w.wynik_3 || '-'} | Etap 4: ${w.wynik_4 || '-'} | Etap 5: ${w.wynik_5 || '-'}<br><br>`;
             document.getElementById('face_time').innerHTML = `Czas badania: ${w.czas}`;
             if (document.getElementById('testyy').value === '0') {
@@ -703,13 +703,13 @@ function wybierzPacjenta() {
                             var w = last.wyniki_json || {};
                             document.getElementById('face_overall').innerHTML = `Prawidłowe odpowiedzi: ${w.wynik_ogolny || last.wynik_ogolny || '-'} /30<br><br>`;
                             document.getElementById('face_gender').innerHTML = `Mężczyźni: ${w.wynik_m || '-'} | Kobiety: ${w.wynik_k || '-'}<br><br>`;
-                            document.getElementById('face_age').innerHTML = `Dzieci: ${w.wynik_d || '-'} | Średni wiek: ${w.wynik_s || '-'} | Podeszły wiek: ${w.wynik_p || '-'}<br><br>`;
+                            document.getElementById('face_age').innerHTML = `Osoby młode: ${w.wynik_d || '-'} | Średni wiek: ${w.wynik_s || '-'} | Podeszły wiek: ${w.wynik_p || '-'}<br><br>`;
                             document.getElementById('face_stages').innerHTML = `Etap 1: ${w.wynik_1 || '-'} | Etap 2: ${w.wynik_2 || '-'} | Etap 3: ${w.wynik_3 || '-'} | Etap 4: ${w.wynik_4 || '-'} | Etap 5: ${w.wynik_5 || '-'}<br><br>`;
                             document.getElementById('face_time').innerHTML = `Czas badania: ${w.czas || last.czas_trwania || '-'} `;
                         } else {
                             document.getElementById('face_overall').innerHTML = `Prawidłowe odpowiedzi: -/30<br><br>`;
                             document.getElementById('face_gender').innerHTML = `Mężczyźni: - | Kobiety: -<br><br>`;
-                            document.getElementById('face_age').innerHTML = `Dzieci: - | Średni wiek: - | Podeszły wiek: -<br><br>`;
+                            document.getElementById('face_age').innerHTML = `Osoby młode: - | Średni wiek: - | Podeszły wiek: -<br><br>`;
                             document.getElementById('face_stages').innerHTML = `Etap 1: - | Etap 2: - | Etap 3: - | Etap 4: - | Etap 5: -<br><br>`;
                             document.getElementById('face_time').innerHTML = `Czas badania: -`;
                         }
@@ -732,7 +732,7 @@ function wybierzPacjenta() {
                     if (selectedType === 'twarze') {
                         document.getElementById('face_overall').innerHTML = `Prawidłowe odpowiedzi: -/30<br><br>`;
                         document.getElementById('face_gender').innerHTML = `Mężczyźni: - | Kobiety: -<br><br>`;
-                        document.getElementById('face_age').innerHTML = `Dzieci: - | Średni wiek: - | Podeszły wiek: -<br><br>`;
+                        document.getElementById('face_age').innerHTML = `Osoby młode: - | Średni wiek: - | Podeszły wiek: -<br><br>`;
                         document.getElementById('face_stages').innerHTML = `Etap 1: - | Etap 2: - | Etap 3: - | Etap 4: - | Etap 5: -<br><br>`;
                         document.getElementById('face_time').innerHTML = `Czas badania: -`;
                     } else {

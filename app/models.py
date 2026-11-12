@@ -6,6 +6,7 @@
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.db import models
+from django.contrib.auth.models import User
 
 class AuthGroup(models.Model):
     name = models.CharField(unique=True, max_length=150)
@@ -170,30 +171,15 @@ class Uzytkownik(models.Model):
     imie = models.CharField(max_length=50)
     nazwisko = models.CharField(max_length=50)
     specjalista = models.CharField(max_length=10)
+    auth_user = models.OneToOneField(
+        User,
+        models.SET_NULL,
+        db_column='auth_user_id',
+        related_name='profil_kliniczny',
+        blank=True,
+        null=True,
+    )
 
     class Meta:
         managed = False
         db_table = 'UZYTKOWNIK'
-
-def badanie_zapisz(request):
-    if request.method == "POST":
-        pacjent_id = request.POST.get("pacjent_id")
-        prowadzacy_id = request.POST.get("prowadzacy_id")
-        wynik_ogolny = request.POST.get("wynik_ogolny")
-        czas_trwania = request.POST.get("czas_trwania")
-
-        pacjent = Pacjent.objects.get(pk=pacjent_id)
-        prowadzacy = Uzytkownik.objects.get(pk=prowadzacy_id)
-
-        Badanie.objects.create(
-            id_pacjenta=pacjent,
-            id_prowadzacego=prowadzacy,
-            data_badania=timezone.now().date(),
-            czas_trwania=czas_trwania,
-            wynik_ogolny=wynik_ogolny,
-            wynik_r=request.POST.get('wynik_r'),
-            wynik_g=request.POST.get('wynik_g'),
-            wynik_b=request.POST.get('wynik_b'),
-        )
-        return redirect("badanie_wynik")
-    return render(request, "test.html")

@@ -16,12 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from django.conf import settings
-from django.conf.urls.static import static
-from pathlib import Path
 from app.views import home, login_view, logout_view, info, wybierz_pacjenta, dodaj_pacjenta, aktualizuj_pacjenta, test, test2, zapisz_wyniki, badanie_zapisz, badanie_wynik, get_pacjent_data, export_wyniki
-
-BASE_DIR = Path(__file__).resolve().parent.parent
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -40,6 +35,3 @@ urlpatterns = [
     path('badanie/zapisz/', badanie_zapisz, name='badanie_zapisz'),
     path('badanie/wynik/', badanie_wynik, name='badanie_wynik'),
 ]
-
-if settings.DEBUG:
-    urlpatterns += static(settings.STATIC_URL, document_root=str(BASE_DIR / 'app' / 'templates'))

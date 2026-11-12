@@ -1,50 +1,67 @@
+import argparse
 import os
+import random
+from datetime import date, time
+
 import django
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 
-from app.models import Pacjent, Badanie, Uzytkownik
-from datetime import date, time
-import random
+from django.contrib.auth.models import User
 
-# Pobranie klinicysty
-prowadzacy = Uzytkownik.objects.get(imie='Jan')
+from app.models import Badanie, Pacjent, Uzytkownik
 
-# Dodawanie pacjentów
-pacjenci_data = [
-    ('Anna', 'Nowak', date(1990, 1, 15), 'K', '12345678901'),
-    ('Piotr', 'Zieliński', date(1985, 5, 20), 'M', '98765432109'),
-    ('Maria', 'Lewkowska', date(1992, 3, 10), 'K', '55555555555'),
-    ('Jan', 'Mazur', date(1988, 7, 25), 'M', '11111111111'),
-]
 
-for imie, nazwisko, data_ur, plec, doc in pacjenci_data:
-    if not Pacjent.objects.filter(imie=imie, nazwisko=nazwisko).exists():
-        Pacjent.objects.create(
+def main():
+    parser = argparse.ArgumentParser(description='Add fictional data for local testing only.')
+    parser.add_argument('--username', required=True, help='Login linked to the clinician profile.')
+    parser.add_argument(
+        '--confirm-demo-data',
+        action='store_true',
+        help='Confirm that the target database is not being used for real patient data.',
+    )
+    args = parser.parse_args()
+    if not args.confirm_demo_data:
+        parser.error('Dodawanie danych wymaga flagi --confirm-demo-data.')
+
+    user = User.objects.get(username=args.username)
+    prowadzacy = Uzytkownik.objects.get(auth_user=user)
+    pacjenci_data = [
+        ('Pacjent', 'Testowy 1', date(1990, 1, 15), 'K', 'DEMO-001'),
+        ('Pacjent', 'Testowy 2', date(1985, 5, 20), 'M', 'DEMO-002'),
+        ('Pacjent', 'Testowy 3', date(1992, 3, 10), 'K', 'DEMO-003'),
+        ('Pacjent', 'Testowy 4', date(1988, 7, 25), 'M', 'DEMO-004'),
+    ]
+
+    for imie, nazwisko, data_urodzenia, plec, numer_dokumentu in pacjenci_data:
+        Pacjent.objects.get_or_create(
+            id_prowadzacego=prowadzacy,
             imie=imie,
             nazwisko=nazwisko,
-            data_urodzenia=data_ur,
-            plec=plec,
-            id_prowadzacego=prowadzacy,
-            numer_dokumentu=doc
+            defaults={
+                'data_urodzenia': data_urodzenia,
+                'plec': plec,
+                'numer_dokumentu': numer_dokumentu,
+            },
         )
-        print(f'Dodany pacjent: {imie} {nazwisko}')
 
-# Dodawanie przykładowych wyników badań
-pacjenci = Pacjent.objects.filter(id_prowadzacego=prowadzacy)
-for pacjent in pacjenci:
-    if not Badanie.objects.filter(id_pacjenta=pacjent).exists():
-        Badanie.objects.create(
-            id_pacjenta=pacjent,
-            id_prowadzacego=prowadzacy,
-            data_badania=date.today(),
-            czas_trwania=time(0, random.randint(5, 15), random.randint(0, 59)),
-            wynik_ogolny=round(random.uniform(70, 95), 2),
-            wynik_r=round(random.uniform(60, 90), 2),
-            wynik_g=round(random.uniform(65, 92), 2),
-            wynik_b=round(random.uniform(70, 95), 2)
-        )
-        print(f'Dodany wynik dla pacjenta: {pacjent.imie} {pacjent.nazwisko}')
+    for pacjent in Pacjent.objects.filter(id_prowadzacego=prowadzacy):
+        if not Badanie.objects.filter(id_pacjenta=pacjent).exists():
+            Badanie.objects.create(
+                id_pacjenta=pacjent,
+                id_prowadzacego=prowadzacy,
+                data_badania=date.today(),
+                czas_trwania=time(0, random.randint(5, 15), random.randint(0, 59)),
+                wynik_ogolny=round(random.uniform(70, 95), 2),
+                wynik_r=round(random.uniform(60, 90), 2),
+                wynik_g=round(random.uniform(65, 92), 2),
+                wynik_b=round(random.uniform(70, 95), 2),
+                test_type='kolory',
+            )
 
-print('Gotowe!')
+    print('Dodano/zweryfikowano fikcyjne dane testowe. Nie używaj ich w produkcji.')
+
+
+if __name__ == '__main__':
+    main()

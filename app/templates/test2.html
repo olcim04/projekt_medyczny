@@ -14,6 +14,8 @@
         #ttall { width:calc(30% - 20px); margin:0 auto; }
         #ttall img { width:calc(100% - 1px); max-width:100%; aspect-ratio:1 / 1; height:auto; object-fit:contain; display:block; margin:0 auto; }
         #test { text-align:center; }
+        #main { height:auto; min-height:400px; padding-bottom:24px; }
+        #bot { height:auto; margin-top:24px; padding-bottom:24px; }
     </style>
     <title>Test Twarzy</title>
 </head>
@@ -59,7 +61,7 @@
     </div>
 </body>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+<script src="{% static 'js/paho-mqtt.min.js' %}"></script>
 <script src="{% static 'js/mqtt-joystick.js' %}"></script>
 {{ face_trials|json_script:"face-test-trials" }}
 {{ face_warmup_trials|json_script:"face-test-warmup-trials" }}
@@ -129,7 +131,6 @@ function Twarz(plec, wiek, set, images) {
 let stage = 0;
 let Licznik = 0;
 let P = 0;
-let Sec = 0;
 let c = false;
 let choice = 0;
 let paused = false;
@@ -140,7 +141,10 @@ var [czas_1,czas_2,czas_3,czas_4,czas_5,czas_M,czas_F,czas_dzieci,czas_sredni,cz
 let progress = 0;
 let Wynik = 0;
 var timeString = '00:00:00';
-var dateeee = new Date(0);
+let elapsedMilliseconds = 0;
+let timerStartedAt = null;
+let lastTimerSecond = 0;
+let timerShouldRun = false;
 
 function Cece(){
     c=!c
@@ -201,7 +205,7 @@ function Change() {
             stage++;
         break;
         case 1:
-            c = true;
+            c = false;
             progress = 0;
             PrepareTrial(ListaTwarzy[progress]);
             document.getElementById("ttall").innerHTML = `<img src="${FACE_IMAGE_BASE}${ListaTwarzy[progress].previewImage}" alt="">`;
@@ -228,7 +232,7 @@ function Change() {
             Każdą twarz zobaczysz przez 3 sekundy, a potem wybierz tą samą spośród 3 opcji.<br><br>Jeśli jesteś gotowy(-a), naciśnij przycisk DALEJ<br></h1>`;
             stage++;
             c = false;
-            Sec = 0;
+            resetTimer();
         break;
         default:
             if (stage < 33) {
@@ -237,6 +241,7 @@ function Change() {
                 document.getElementById("paz").style.backgroundColor = "#e0e0e0";
                 stage++;
             } else if (stage === 33) {
+                setTimerRunning(false);
                 if (choice==Kolej) {Zapis_plec(); Zapis_wiek(); Zapis_etap(); wynik_ogolny++; console.log(wynik_ogolny)}
                 document.getElementById("intro").style.display = "inline";
                 document.getElementById("intro").innerHTML = `KONIEC TESTU<br>`
@@ -252,6 +257,7 @@ function Change() {
 }
 
 function PreChange() {
+    setTimerRunning(false);
     if (choice==Kolej) { if ((stage != 3)) {Zapis_plec(); Zapis_wiek(); Zapis_etap(); wynik_ogolny++; Licznik=0; c=false;}}
     const trial = ListaTwarzy[progress];
     if (!trial) {
@@ -272,12 +278,12 @@ function PreChange() {
 }
 
 function PostChange() {
-    c=true;
+    const trial = ListaTwarzy[progress - 1];
+    setTimerRunning(!trial.warmup);
     Choice(0);
     Triada();
     document.getElementById("dal").style.backgroundColor = "#4b78a6";
-    document.getElementById("title").style.display =
-        ListaTwarzy[progress - 1].warmup ? "inline" : "none";
+    document.getElementById("title").style.display = trial.warmup ? "inline" : "none";
     document.getElementById("intro").style.display = "none";
     document.getElementById("triple").style.display = "flex";
     document.getElementById("test").style.display = "inline";
@@ -321,25 +327,46 @@ function Zapis_etap() {
 }
 
 function Czas() {
-    if (c==true && !paused) {Sec++; Licznik++;}
-    dateeee.setSeconds(Sec);
-    timeString = dateeee.toISOString().substring(11, 19);
+    const currentElapsed = elapsedMilliseconds + (
+        timerStartedAt === null ? 0 : performance.now() - timerStartedAt
+    );
+    const elapsedSeconds = Math.floor(currentElapsed / 1000);
+    if (timerStartedAt !== null && elapsedSeconds > lastTimerSecond) {
+        Licznik += elapsedSeconds - lastTimerSecond;
+    }
+    lastTimerSecond = elapsedSeconds;
+    timeString = formatSecondsToTimeString(elapsedSeconds);
     const timerEl = document.getElementById("timer");
     if (timerEl) {
         timerEl.textContent = timeString;
     }
 }
-const Zegarek = setInterval(Czas, 1000)
 
-const PREVIEW_SECONDS_PER_FACE = 3;
-const PREVIEW_FACE_COUNT = 30;
-const PREVIEW_TIME_TOTAL_SECONDS = PREVIEW_SECONDS_PER_FACE * PREVIEW_FACE_COUNT;
+function setTimerRunning(running) {
+    timerShouldRun = running;
+    freezeTimer();
+    if (running && !paused) {
+        timerStartedAt = performance.now();
+    }
+    lastTimerSecond = Math.floor(elapsedMilliseconds / 1000);
+    Czas();
+}
 
-function getSecondsFromTimeString(value) {
-    if (!value || typeof value !== 'string') return 0;
-    const parts = value.split(':').map(Number);
-    if (parts.length !== 3 || parts.some(Number.isNaN)) return 0;
-    return (parts[0] * 3600) + (parts[1] * 60) + parts[2];
+function freezeTimer() {
+    if (timerStartedAt !== null) {
+        Czas();
+        elapsedMilliseconds += performance.now() - timerStartedAt;
+        timerStartedAt = null;
+    }
+}
+
+function resetTimer() {
+    setTimerRunning(false);
+    elapsedMilliseconds = 0;
+    lastTimerSecond = 0;
+    Licznik = 0;
+    timeString = '00:00:00';
+    Czas();
 }
 
 function formatSecondsToTimeString(totalSeconds) {
@@ -376,6 +403,7 @@ function Powrot() {
 }
 
 function stopTest() {
+    freezeTimer();
     paused = true;
     document.getElementById("pauseOverlay").style.display = "flex";
     document.getElementById("paz").style.display = "none";
@@ -384,6 +412,7 @@ function stopTest() {
 
 function resumeTest() {
     paused = false;
+    setTimerRunning(timerShouldRun);
     document.getElementById("pauseOverlay").style.display = "none";
     document.getElementById("paz").style.display = "inline";
     document.getElementById("wznów_btn").style.display = "none";
@@ -394,12 +423,10 @@ function wznówTest() {
 }
 
 function SaveResults() {
-    const totalSeconds = getSecondsFromTimeString(timeString);
-    const adjustedSeconds = Math.max(0, totalSeconds - PREVIEW_TIME_TOTAL_SECONDS);
-    const adjustedTimeString = formatSecondsToTimeString(adjustedSeconds);
+    setTimerRunning(false);
 
     var wyniki = {
-        czas: adjustedTimeString,
+        czas: formatSecondsToTimeString(Math.floor(elapsedMilliseconds / 1000)),
         wynik_ogolny: wynik_ogolny,
         wynik_1: wynik_1,
         wynik_2: wynik_2,
@@ -425,6 +452,8 @@ function SaveResults() {
     sessionStorage.setItem('wyniki', JSON.stringify(wyniki));
     window.location.href = '{% url "info" %}';
 }
+
+const Zegarek = setInterval(Czas, 100);
 
 </script>
 
