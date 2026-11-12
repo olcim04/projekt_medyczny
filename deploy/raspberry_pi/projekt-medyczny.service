@@ -1,0 +1,21 @@
+[Unit]
+Description=Projekt Medyczny Django application
+Requires=mariadb.service
+After=network.target mariadb.service
+
+[Service]
+Type=simple
+User=@APP_USER@
+Group=@APP_GROUP@
+WorkingDirectory=@PROJECT_DIR@
+EnvironmentFile=/etc/projekt_medyczny.env
+ExecStart=@PROJECT_DIR@/.venv/bin/gunicorn --workers 2 --bind 0.0.0.0:8000 --timeout 120 config.wsgi:application
+Restart=on-failure
+RestartSec=5
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

@@ -114,6 +114,11 @@ def home(request):
         return redirect('info')
     return render(request, 'home.html')
 
+
+def _get_clinician_profile(user):
+    return Uzytkownik.objects.filter(auth_user_id=user.pk).first()
+
+
 def _xlsx_col_letter(index):
     result = ''
     while index >= 0:
@@ -224,16 +229,7 @@ def login_view(request):
 
 @login_required
 def info(request):
-    # Pobierz użytkownika z tabeli UZYTKOWNIK na podstawie username
-    try:
-        prowadzacy = Uzytkownik.objects.get(imie__iexact=request.user.username)
-    except Uzytkownik.DoesNotExist:
-        # Spróbuj znaleźć po imieniu z first_name
-        try:
-            prowadzacy = Uzytkownik.objects.get(imie__iexact=request.user.first_name)
-        except Uzytkownik.DoesNotExist:
-            prowadzacy = None
-    
+    prowadzacy = _get_clinician_profile(request.user)
     pacjenci = Pacjent.objects.filter(id_prowadzacego=prowadzacy) if prowadzacy else Pacjent.objects.none()
     wybrany_pacjent_id = request.session.get('wybrany_pacjent')
     wyniki = None
@@ -253,15 +249,10 @@ def info(request):
 @login_required
 def get_pacjent_data(request, pacjent_id):
     try:
-        # Pobierz użytkownika z tabeli UZYTKOWNIK
-        try:
-            prowadzacy = Uzytkownik.objects.get(imie__iexact=request.user.username)
-        except Uzytkownik.DoesNotExist:
-            try:
-                prowadzacy = Uzytkownik.objects.get(imie__iexact=request.user.first_name)
-            except Uzytkownik.DoesNotExist:
-                prowadzacy = None
-        
+        prowadzacy = _get_clinician_profile(request.user)
+        if prowadzacy is None:
+            return JsonResponse({'error': 'Konto nie ma powiązanego profilu klinicznego.'}, status=403)
+
         pacjent = Pacjent.objects.get(id_pacjenta=pacjent_id, id_prowadzacego=prowadzacy)
         from datetime import date
         wiek = date.today().year - pacjent.data_urodzenia.year - ((date.today().month, date.today().day) < (pacjent.data_urodzenia.month, pacjent.data_urodzenia.day))
@@ -336,20 +327,10 @@ def dodaj_pacjenta(request):
             messages.error(request, 'Nieprawidłowy format daty urodzenia. Użyj YYYY-MM-DD.')
             return redirect('info')
 
-        # Powiąż aktualny auth_user z tabelą Uzytkownik po imieniu (username)
-        try:
-            prowadzacy = Uzytkownik.objects.get(imie__iexact=request.user.username)
-        except Uzytkownik.DoesNotExist:
-            # Spróbuj po first_name
-            try:
-                prowadzacy = Uzytkownik.objects.get(imie__iexact=request.user.first_name)
-            except Uzytkownik.DoesNotExist:
-                # Jeśli nie ma w tabeli Uzytkownik, utwórz tymczasowo
-                prowadzacy = Uzytkownik.objects.create(
-                    imie=request.user.username,
-                    nazwisko=request.user.last_name or '',
-                    specjalista='klinicysta'
-                )
+        prowadzacy = _get_clinician_profile(request.user)
+        if prowadzacy is None:
+            messages.error(request, 'Konto nie ma powiązanego profilu klinicznego.')
+            return redirect('info')
 
         Pacjent.objects.create(
             imie=imie,
@@ -418,15 +399,10 @@ def aktualizuj_pacjenta(request):
             messages.error(request, 'Nieprawidłowy format daty urodzenia.')
             return redirect('info')
 
-        # Pobierz użytkownika z tabeli UZYTKOWNIK
-        try:
-            prowadzacy = Uzytkownik.objects.get(imie__iexact=request.user.username)
-        except Uzytkownik.DoesNotExist:
-            try:
-                prowadzacy = Uzytkownik.objects.get(imie__iexact=request.user.first_name)
-            except Uzytkownik.DoesNotExist:
-                messages.error(request, 'Nie znaleziono użytkownika w systemie.')
-                return redirect('info')
+        prowadzacy = _get_clinician_profile(request.user)
+        if prowadzacy is None:
+            messages.error(request, 'Konto nie ma powiązanego profilu klinicznego.')
+            return redirect('info')
 
         try:
             pacjent = Pacjent.objects.get(
@@ -458,34 +434,54 @@ def aktualizuj_pacjenta(request):
 
 @login_required
 def zapisz_wyniki(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        pacjent_id = request.session.get('wybrany_pacjent')
-        if not pacjent_id:
-            return JsonResponse({'error': 'Brak wybranego pacjenta'}, status=400)
-        pacjent = Pacjent.objects.get(id_pacjenta=pacjent_id)
-        prowadzacy = Uzytkownik.objects.get(id_uzytkownika=request.user.id)
-        # Przyjmujemy dwa formaty wynikow: test kolorow (wynik_r/g/b) albo test twarzy (zlozony obiekt)
-        kwargs = {
-            'id_pacjenta': pacjent,
-            'id_prowadzacego': prowadzacy,
-            'data_badania': timezone.now().date(),
-            'czas_trwania': data.get('czas', '00:00:00'),
-            'wynik_ogolny': data.get('wynik_ogolny')
-        }
-        if 'wynik_r' in data or 'wynik_g' in data or 'wynik_b' in data:
-            kwargs['wynik_r'] = data.get('wynik_r')
-            kwargs['wynik_g'] = data.get('wynik_g')
-            kwargs['wynik_b'] = data.get('wynik_b')
-            kwargs['test_type'] = 'kolory'
-        else:
-            # Zapisz pełny obiekt wyników do kolumny wyniki_json
-            kwargs['wyniki_json'] = json.dumps(data, ensure_ascii=False)
-            kwargs['test_type'] = 'twarze'
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Invalid method'}, status=405)
 
-        Badanie.objects.create(**kwargs)
-        return JsonResponse({'success': True})
-    return JsonResponse({'error': 'Invalid method'}, status=405)
+    try:
+        data = json.loads(request.body)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return JsonResponse({'error': 'Nieprawidłowy format JSON.'}, status=400)
+    if not isinstance(data, dict):
+        return JsonResponse({'error': 'Wyniki muszą być obiektem JSON.'}, status=400)
+
+    pacjent_id = request.session.get('wybrany_pacjent')
+    if not pacjent_id:
+        return JsonResponse({'error': 'Brak wybranego pacjenta'}, status=400)
+
+    prowadzacy = _get_clinician_profile(request.user)
+    if prowadzacy is None:
+        return JsonResponse({'error': 'Konto nie ma powiązanego profilu klinicznego.'}, status=403)
+
+    pacjent = Pacjent.objects.filter(
+        id_pacjenta=pacjent_id,
+        id_prowadzacego=prowadzacy,
+    ).first()
+    if pacjent is None:
+        return JsonResponse({'error': 'Pacjent nie znaleziony.'}, status=404)
+
+    kwargs = {
+        'id_pacjenta': pacjent,
+        'id_prowadzacego': prowadzacy,
+        'id_wykonujacego': prowadzacy,
+        'data_badania': timezone.now().date(),
+        'czas_trwania': data.get('czas', '00:00:00'),
+        'wynik_ogolny': data.get('wynik_ogolny'),
+    }
+    if any(key in data for key in ('wynik_r', 'wynik_g', 'wynik_b')):
+        kwargs.update({
+            'wynik_r': data.get('wynik_r'),
+            'wynik_g': data.get('wynik_g'),
+            'wynik_b': data.get('wynik_b'),
+            'test_type': 'kolory',
+        })
+    else:
+        kwargs.update({
+            'wyniki_json': json.dumps(data, ensure_ascii=False),
+            'test_type': 'twarze',
+        })
+
+    Badanie.objects.create(**kwargs)
+    return JsonResponse({'success': True})
 
 @login_required
 def export_wyniki(request):
@@ -493,14 +489,9 @@ def export_wyniki(request):
     if not pacjent_id:
         return JsonResponse({'error': 'Najpierw wybierz pacjenta.'}, status=400)
 
-    # Pobierz użytkownika z tabeli UZYTKOWNIK
-    try:
-        prowadzacy = Uzytkownik.objects.get(imie__iexact=request.user.username)
-    except Uzytkownik.DoesNotExist:
-        try:
-            prowadzacy = Uzytkownik.objects.get(imie__iexact=request.user.first_name)
-        except Uzytkownik.DoesNotExist:
-            return JsonResponse({'error': 'Nie znaleziono użytkownika w systemie.'}, status=400)
+    prowadzacy = _get_clinician_profile(request.user)
+    if prowadzacy is None:
+        return JsonResponse({'error': 'Konto nie ma powiązanego profilu klinicznego.'}, status=403)
 
     pacjent = get_object_or_404(Pacjent, id_pacjenta=pacjent_id, id_prowadzacego=prowadzacy)
     test_name = request.GET.get('test_name', '').strip()
@@ -520,7 +511,7 @@ def export_wyniki(request):
     is_color = 'kolor' in tn or 'color' in tn
 
     if is_face:
-        headers = ['Data badania', 'Czas trwania', 'Wynik ogólny', 'Mężczyźni', 'Kobiety', 'Dzieci', 'Średni wiek', 'Podeszły wiek', 'Etap1', 'Etap2', 'Etap3', 'Etap4', 'Etap5']
+        headers = ['Data badania', 'Czas trwania', 'Wynik ogólny', 'Mężczyźni', 'Kobiety', 'Osoby młode', 'Średni wiek', 'Podeszły wiek', 'Etap1', 'Etap2', 'Etap3', 'Etap4', 'Etap5']
         rows.append(headers)
         for badanie in badania.filter(test_type='twarze'):
             # prefer wyniki_json, fallback to field mapping
@@ -582,20 +573,25 @@ def logout_view(request):
     messages.info(request, 'Zostałeś wylogowany. Zaloguj się ponownie.')
     return redirect('home')
 
+@login_required
 def badanie_zapisz(request):
     if request.method == 'POST':
-        pacjent_id = request.POST.get('pacjent_id') or 1
-        prowadzacy_id = request.POST.get('prowadzacy_id') or 1
+        prowadzacy = _get_clinician_profile(request.user)
+        if prowadzacy is None:
+            return render(request, 'test.html', {'error': 'Konto nie ma profilu klinicznego.'}, status=403)
+        pacjent_id = request.POST.get('pacjent_id')
         czas_trwania = request.POST.get('czas_trwania') or '00:00:00'
         wynik_ogolny = request.POST.get('wynik_ogolny') or 0
         wynik_r = request.POST.get('wynik_r') or 0
         wynik_g = request.POST.get('wynik_g') or 0
         wynik_b = request.POST.get('wynik_b') or 0
 
-        pacjent = Pacjent.objects.filter(pk=pacjent_id).first()
-        prowadzacy = Uzytkownik.objects.filter(pk=prowadzacy_id).first()
+        pacjent = Pacjent.objects.filter(
+            pk=pacjent_id,
+            id_prowadzacego=prowadzacy,
+        ).first()
 
-        if pacjent and prowadzacy:
+        if pacjent:
             Badanie.objects.create(
                 id_pacjenta=pacjent,
                 id_prowadzacego=prowadzacy,
@@ -606,6 +602,7 @@ def badanie_zapisz(request):
                 wynik_r=wynik_r,
                 wynik_g=wynik_g,
                 wynik_b=wynik_b,
+                test_type='kolory',
             )
             return redirect('badanie_wynik')
         return render(request, 'test.html', {'error': 'Nie znaleziono pacjenta lub prowadzącego'})
