@@ -1,0 +1,10 @@
+Paho MQTT JavaScript client, version 1.0.1
+Copyright (c) 2013, 2014 IBM Corp.
+
+Upstream: https://github.com/eclipse-paho/paho.mqtt.javascript
+Distributed under the Eclipse Public License v1.0 and Eclipse Distribution
+License v1.0. The license terms are included in the header of
+paho-mqtt.min.js and are available at:
+
+https://www.eclipse.org/legal/epl-v10.html
+https://www.eclipse.org/org/documents/edl-v10.php
