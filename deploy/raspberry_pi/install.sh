@@ -221,7 +221,8 @@ while true; do
     break
 done
 
-PROFILE_UUIDS="$(nmcli -g UUID connection show "$HOTSPOT_NAME" 2>/dev/null || true)"
+PROFILE_UUIDS="$(nmcli -t -f UUID,NAME connection show |
+    awk -F: -v name="$HOTSPOT_NAME" 'NF == 2 && $2 == name { print $1 }')"
 [[ "$PROFILE_UUIDS" != *$'\n'* ]] ||
     fail "Znaleziono kilka profili NetworkManager o nazwie $HOTSPOT_NAME; nie zmieniono ich."
 PROFILE_UUID="$PROFILE_UUIDS"
@@ -259,7 +260,7 @@ else
         ipv6.method disabled \
         connection.autoconnect yes \
         connection.autoconnect-priority 100
-    PROFILE_UUID="$(nmcli -g UUID connection show "$HOTSPOT_NAME" | head -n 1)"
+    PROFILE_UUID="$(nmcli -g connection.uuid connection show id "$HOTSPOT_NAME")"
 fi
 unset WIFI_PASSWORD WIFI_PASSWORD_CONFIRM
 
@@ -307,9 +308,10 @@ systemctl is-enabled --quiet dnsmasq ||
 nmcli -g connection.autoconnect connection show "$PROFILE_UUID" | grep -qx yes ||
     fail "Profil hotspotu nie ma włączonego autostartu."
 
+printf '\nAktywuję hotspot. Bieżące połączenie sieciowe może zostać przerwane.\n'
+nmcli connection up uuid "$PROFILE_UUID"
+
 printf '\nHotspot Wi-Fi jest skonfigurowany: SSID %s, adres 10.42.0.1/24.\n' "$SSID"
 printf 'DHCP przydziela adresy lokalnie; nie jest ogłaszana brama internetowa.\n'
 printf 'Aplikacja: http://10.42.0.1:8000\n'
 printf 'Usługi: sudo systemctl status projekt-medyczny mariadb dnsmasq\n'
-printf 'Aktywuję hotspot. Bieżące połączenie sieciowe może zostać przerwane.\n'
-nmcli connection up "$PROFILE_UUID"

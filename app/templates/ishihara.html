@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/home.css' %}">
+    <title>Test Ishihary</title>
+    <style>
+        .ishihara-main {
+            min-height: 400px;
+            margin: 0 auto 24px;
+            max-width: 900px;
+        }
+        #ishihara-plate {
+            display: block;
+            width: min(100%, 400px, 52vh);
+            height: auto;
+            aspect-ratio: 1;
+            object-fit: contain;
+            margin: 0 auto 16px;
+        }
+        .ishihara-answers {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+        }
+        .ishihara-answer {
+            width: auto;
+            min-height: 56px;
+            height: auto;
+            padding: 12px 20px;
+            border: 2px solid #ccc;
+            border-radius: 6px;
+            background: white;
+            color: #333;
+            font-size: 1.25rem;
+        }
+        .ishihara-answer:hover, .ishihara-answer[aria-pressed="true"] {
+            background: white;
+            border-color: #4b78a6;
+        }
+        .ishihara-answer[aria-pressed="true"] {
+            box-shadow: 0 4px 12px rgba(75, 120, 166, 0.18);
+        }
+        .ishihara-answer:focus-visible {
+            outline: 2px solid #29496a;
+            outline-offset: 2px;
+        }
+        #ishihara-next:disabled, #ishihara-pause:disabled {
+            background: #aaa;
+            cursor: default;
+        }
+        #ishihara-pause-dialog {
+            max-width: 420px;
+            border: 2px solid #444;
+            border-radius: 12px;
+            padding: 24px;
+        }
+        #ishihara-pause-dialog::backdrop { background: rgba(255, 255, 255, 0.95); }
+        #ishihara-resume { width: auto; padding: 0 20px; }
+    </style>
+</head>
+<body>
+    <header>
+        <p>Czas testu: <span id="ishihara-timer">00:00:00</span></p>
+        <button type="button" class="btn-small" id="ishihara-pause" disabled>STOP</button>
+        <button type="button" class="btn-small" id="ishihara-back">WRÓĆ</button>
+        <h1 id="title">TEST ISHIHARY</h1>
+    </header>
+
+    <main class="ishihara-main">
+        <div id="intro">
+            <p>Ten test sprawdza, jak rozpoznajesz kolory. Wybierz podpis odpowiadający liczbie na planszy.</p>
+            <p>Naciśnij START, aby przejść do rozgrzewki.</p>
+        </div>
+        <section id="ishihara-round" aria-label="Plansza testowa" hidden>
+            <p id="ishihara-warmup">Rozgrzewka</p>
+            <img id="ishihara-plate" src="{% static 'testimg/Ishihara/Ishihara_00.png' %}" alt="Plansza Ishihary">
+            <div class="ishihara-answers" role="group" aria-label="Wybierz liczbę">
+                <button type="button" class="ishihara-answer" aria-pressed="false"></button>
+                <button type="button" class="ishihara-answer" aria-pressed="false"></button>
+                <button type="button" class="ishihara-answer" aria-pressed="false"></button>
+            </div>
+        </section>
+    </main>
+    <div id="bot">
+        <button type="button" id="ishihara-next">START</button>
+    </div>
+    <dialog id="ishihara-pause-dialog" aria-labelledby="ishihara-pause-title">
+        <h2 id="ishihara-pause-title">Test wstrzymany</h2>
+        <button type="button" class="btn-small" id="ishihara-resume">WRÓĆ DO TESTU</button>
+    </dialog>
+
+    <script src="{% static 'js/paho-mqtt.min.js' %}"></script>
+    <script src="{% static 'js/mqtt-joystick.js' %}"></script>
+    {{ ishihara_answers|json_script:"ishihara-answers" }}
+    {{ pacjent_id|json_script:"ishihara-patient" }}
+    <script>
+        const infoUrl = '{% url "info" %}';
+        const imageBase = '{% static "testimg/Ishihara/" %}';
+        const answers = JSON.parse(document.getElementById('ishihara-answers').textContent);
+        const patientId = JSON.parse(document.getElementById('ishihara-patient').textContent);
+        const plates = answers.map((choices, index) => ({
+            image: 'Ishihara_' + String(index).padStart(2, '0') + '.png',
+            choices,
+        }));
+        const rounds = [plates[0], ...shuffle(plates.slice(1, 7)), ...shuffle(plates.slice(7))];
+
+        const intro = document.getElementById('intro');
+        const roundSection = document.getElementById('ishihara-round');
+        const plateImage = document.getElementById('ishihara-plate');
+        const answerButtons = Array.from(document.querySelectorAll('.ishihara-answer'));
+        const nextButton = document.getElementById('ishihara-next');
+        const pauseButton = document.getElementById('ishihara-pause');
+        const pauseDialog = document.getElementById('ishihara-pause-dialog');
+        const timer = document.getElementById('ishihara-timer');
+
+        let roundIndex = -1;
+        let selectedAnswer = null;
+        let correctAnswers = 0;
+        let elapsed = 0;
+        let startedAt = null;
+
+        function shuffle(items) {
+            for (let index = items.length - 1; index > 0; index--) {
+                const other = Math.floor(Math.random() * (index + 1));
+                [items[index], items[other]] = [items[other], items[index]];
+            }
+            return items;
+        }
+
+        function updateTimer() {
+            const duration = elapsed + (startedAt === null ? 0 : performance.now() - startedAt);
+            timer.textContent = new Date(duration).toISOString().slice(11, 19);
+        }
+
+        function stopTimer() {
+            if (startedAt !== null) {
+                elapsed += performance.now() - startedAt;
+                startedAt = null;
+            }
+            updateTimer();
+        }
+
+        function selectAnswer(button) {
+            selectedAnswer = button;
+            answerButtons.forEach(option => option.setAttribute('aria-pressed', String(option === button)));
+            nextButton.disabled = button === null;
+        }
+
+        function showRound() {
+            const { image, choices } = rounds[roundIndex];
+            plateImage.src = imageBase + image;
+            shuffle([...choices]).forEach((label, index) => {
+                answerButtons[index].textContent = label;
+            });
+            selectAnswer(null);
+            intro.hidden = true;
+            roundSection.hidden = false;
+            pauseButton.disabled = false;
+        }
+
+        answerButtons.forEach(button => button.addEventListener('click', () => selectAnswer(button)));
+        nextButton.addEventListener('click', () => {
+            if (roundIndex === rounds.length) {
+                sessionStorage.setItem('wyniki', JSON.stringify({
+                    test_type: 'ishihara',
+                    pacjent_id: patientId,
+                    wynik_ogolny: correctAnswers,
+                    czas: timer.textContent,
+                }));
+                window.location.href = infoUrl;
+                return;
+            }
+
+            if (roundIndex === -1 && nextButton.textContent === 'START') {
+                intro.textContent = 'To jest rozgrzewka. Zaznacz podpis odpowiadający liczbie na planszy, a potem naciśnij DALEJ.';
+                nextButton.textContent = 'DALEJ';
+                return;
+            }
+
+            if (roundIndex === 0 && !roundSection.hidden) {
+                roundSection.hidden = true;
+                intro.textContent = 'Rozgrzewka zakończona. Naciśnij DALEJ, aby rozpocząć właściwy test.';
+                intro.hidden = false;
+                pauseButton.disabled = true;
+                return;
+            }
+
+            if (roundIndex > 0 && selectedAnswer.textContent === rounds[roundIndex].choices[0]) {
+                correctAnswers++;
+            }
+            roundIndex++;
+
+            if (roundIndex === rounds.length) {
+                stopTimer();
+                roundSection.hidden = true;
+                intro.hidden = false;
+                intro.textContent = 'KONIEC TESTU';
+                pauseButton.disabled = true;
+                nextButton.textContent = 'ZAKOŃCZ';
+                return;
+            }
+
+            showRound();
+            if (roundIndex === 1) {
+                document.getElementById('title').hidden = true;
+                document.getElementById('ishihara-warmup').hidden = true;
+                startedAt = performance.now();
+            }
+        });
+
+        pauseButton.addEventListener('click', () => {
+            stopTimer();
+            pauseDialog.showModal();
+        });
+        document.getElementById('ishihara-resume').addEventListener('click', () => pauseDialog.close());
+        pauseDialog.addEventListener('close', () => {
+            if (roundIndex > 0 && roundIndex < rounds.length) {
+                startedAt = performance.now();
+            }
+        });
+        document.getElementById('ishihara-back').addEventListener('click', () => {
+            if (confirm('Czy na pewno chcesz zakończyć test?')) {
+                window.location.href = infoUrl;
+            }
+        });
+
+        setInterval(updateTimer, 250);
+        window.MQTTJoystick?.init({
+            host: window.MQTT_BROKER_HOST || window.location.hostname || 'localhost',
+            simulateKeyboard: false,
+        }, value => {
+            if (pauseDialog.open) return;
+            if (value === 2) {
+                nextButton.click();
+            } else if (!roundSection.hidden && [-1, 0, 1].includes(value)) {
+                const current = answerButtons.indexOf(selectedAnswer);
+                const position = current < 0 ? 1 : current;
+                const next = value === 0 ? 1 : Math.max(0, Math.min(2, position + value));
+                selectAnswer(answerButtons[next]);
+            }
+        });
+    </script>
+</body>
+</html>
