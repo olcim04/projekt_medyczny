@@ -21,6 +21,24 @@ _FACE_TEST_EXTRA_IMAGES = {
 }
 
 
+_ISHIHARA_ANSWERS = (
+    ('Dwanaście', 'Siedem', 'Dwadzieścia'),
+    ('Siedemdziesiąt cztery', 'Dwadzieścia jeden', 'Siedemdziesiąt jeden'),
+    ('Sześć', 'Osiem', 'Dziewięć'),
+    ('Szesnaście', 'Siedemdziesiąt osiem', 'Dwadzieścia sześć'),
+    ('Dwa', 'Siedem', 'Dziewięć'),
+    ('Dwadzieścia dziewięć', 'Siedemdziesiąt', 'Siedemdziesiąt dziewięć'),
+    ('Siedem', 'Dwa', 'Jeden'),
+    ('Czterdzieści pięć', 'Dwanaście', 'Siedemdziesiąt sześć'),
+    ('Pięć', 'Dwa', 'Trzy'),
+    ('Dziewięćdziesiąt siedem', 'Dziewięćdziesiąt jeden', 'Osiemdziesiąt siedem'),
+    ('Osiem', 'Trzy', 'Sześć'),
+    ('Czterdzieści dwa', 'Cztery', 'Dwa'),
+    ('Trzy', 'Dziewięć', 'Osiem'),
+)
+_ISHIHARA_TRIAL_COUNT = len(_ISHIHARA_ANSWERS) - 1
+
+
 def _build_face_test_data(image_root=None):
     if image_root is None:
         if not settings.STATICFILES_DIRS:
@@ -244,6 +262,7 @@ def info(request):
         'pacjenci': pacjenci,
         'wyniki': wyniki,
         'wybrany_pacjent': wybrany_pacjent,
+        'ishihara_trial_count': _ISHIHARA_TRIAL_COUNT,
     })
 
 @login_required
@@ -259,6 +278,7 @@ def get_pacjent_data(request, pacjent_id):
         ostatnie_badanie = Badanie.objects.filter(id_pacjenta=pacjent).order_by('-data_badania', '-id_badania').first()
         ostatnie_badanie_kolory = Badanie.objects.filter(id_pacjenta=pacjent, test_type='kolory').order_by('-data_badania', '-id_badania').first()
         ostatnie_badanie_twarze = Badanie.objects.filter(id_pacjenta=pacjent, test_type='twarze').order_by('-data_badania', '-id_badania').first()
+        ostatnie_badanie_ishihara = Badanie.objects.filter(id_pacjenta=pacjent, test_type='ishihara').order_by('-data_badania', '-id_badania').first()
         plec_map = {'M': 'Mężczyzna', 'K': 'Kobieta', 'Inna': 'Inna'}
 
         def badanie_to_dict(badanie):
@@ -288,6 +308,7 @@ def get_pacjent_data(request, pacjent_id):
             'ostatnie_badanie': badanie_to_dict(ostatnie_badanie) if ostatnie_badanie else None,
             'ostatnie_badanie_kolory': badanie_to_dict(ostatnie_badanie_kolory),
             'ostatnie_badanie_twarze': badanie_to_dict(ostatnie_badanie_twarze),
+            'ostatnie_badanie_ishihara': badanie_to_dict(ostatnie_badanie_ishihara),
         }
         return JsonResponse(data)
     except Pacjent.DoesNotExist:
@@ -368,6 +389,21 @@ def test2(request):
         'face_trials': face_test_data['trials'],
         'face_warmup_trials': face_test_data['warmup_trials'],
     })
+
+@login_required
+def test_ishihara(request):
+    pacjent_id = request.session.get('wybrany_pacjent')
+    if not pacjent_id:
+        messages.error(request, 'Najpierw wybierz pacjenta')
+        return redirect('info')
+    if request.GET.get('pacjent_id', str(pacjent_id)) != str(pacjent_id):
+        messages.error(request, 'Wybór pacjenta się zmienił. Wybierz pacjenta ponownie.')
+        return redirect('info')
+    return render(request, 'ishihara.html', {
+        'ishihara_answers': _ISHIHARA_ANSWERS,
+        'pacjent_id': pacjent_id,
+    })
+
 
 @login_required
 def aktualizuj_pacjenta(request):
@@ -467,7 +503,17 @@ def zapisz_wyniki(request):
         'czas_trwania': data.get('czas', '00:00:00'),
         'wynik_ogolny': data.get('wynik_ogolny'),
     }
-    if any(key in data for key in ('wynik_r', 'wynik_g', 'wynik_b')):
+    if data.get('test_type') == 'ishihara':
+        if data.get('pacjent_id') != pacjent.pk:
+            return JsonResponse({'error': 'Od rozpoczęcia testu zmienił się wybrany pacjent.'}, status=409)
+        wynik = kwargs['wynik_ogolny']
+        czas = kwargs['czas_trwania']
+        if type(wynik) is not int or not 0 <= wynik <= _ISHIHARA_TRIAL_COUNT:
+            return JsonResponse({'error': 'Nieprawidłowy wynik testu Ishihary.'}, status=400)
+        if not isinstance(czas, str) or not re.fullmatch(r'(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]', czas):
+            return JsonResponse({'error': 'Nieprawidłowy czas testu Ishihary.'}, status=400)
+        kwargs['test_type'] = 'ishihara'
+    elif any(key in data for key in ('wynik_r', 'wynik_g', 'wynik_b')):
         kwargs.update({
             'wynik_r': data.get('wynik_r'),
             'wynik_g': data.get('wynik_g'),
@@ -510,7 +556,19 @@ def export_wyniki(request):
     is_face = 'twar' in tn or 'face' in tn
     is_color = 'kolor' in tn or 'color' in tn
 
-    if is_face:
+    if 'ishihara' in tn or 'ishihary' in tn:
+        badania_ishihara = badania.filter(test_type='ishihara')
+        if not badania_ishihara.exists():
+            return JsonResponse({'error': 'Brak wyników testu Ishihary dla wybranego pacjenta.'}, status=400)
+        rows.append(['Data badania', 'Czas trwania', 'Poprawne odpowiedzi', 'Liczba plansz'])
+        for badanie in badania_ishihara:
+            rows.append([
+                badanie.data_badania.strftime('%Y-%m-%d'),
+                str(badanie.czas_trwania),
+                int(badanie.wynik_ogolny),
+                _ISHIHARA_TRIAL_COUNT,
+            ])
+    elif is_face:
         headers = ['Data badania', 'Czas trwania', 'Wynik ogólny', 'Mężczyźni', 'Kobiety', 'Osoby młode', 'Średni wiek', 'Podeszły wiek', 'Etap1', 'Etap2', 'Etap3', 'Etap4', 'Etap5']
         rows.append(headers)
         for badanie in badania.filter(test_type='twarze'):
@@ -611,4 +669,7 @@ def badanie_zapisz(request):
 
 
 def badanie_wynik(request):
-    return render(request, 'info.html', {'message': 'Badanie zapisane w bazie.'})
+    return render(request, 'info.html', {
+        'message': 'Badanie zapisane w bazie.',
+        'ishihara_trial_count': _ISHIHARA_TRIAL_COUNT,
+    })

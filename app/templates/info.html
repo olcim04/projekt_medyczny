@@ -89,8 +89,9 @@
                 <div><br><label for="testyy">Badanie:</label>
                 <select name="testyy" id="testyy" onchange="aktualizujWynikiWidocznosc(); if (document.getElementById('iinlist').value !== '0') wybierzPacjenta();">
                 <option value="0">Wybierz badanie</option>
-                <option value="{% url 'test' %}">Test kolorów</option>
-                <option value="{% url 'test2' %}">Test twarzy</option>
+                <option value="{% url 'test' %}" data-test-type="kolory">Test kolorów</option>
+                <option value="{% url 'test2' %}" data-test-type="twarze">Test twarzy</option>
+                <option value="{% url 'test_ishihara' %}" data-test-type="ishihara">Test Ishihary</option>
                 </select> <br><br>
                 <button class="btn-small" onclick="rozpocznijTest()" id="start_btn">START</button>
                 <button class="btn-small" onclick="exportWyniki()" id="export_btn" style="margin-left: 10px;">EKSPORTUJ</button>
@@ -100,11 +101,11 @@
                     <div id="pending_results_message" style="display:none; margin-bottom: 10px; font-weight: bold; color: #333;"></div>
                     <!-- Kolorowy test -->
                     <div id="color_results">
-                        <div id="red">Czerwony: {% if wyniki and wyniki.test_type != 'twarze' %}{{ wyniki.wynik_r|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
-                        <div id="green">Zielony: {% if wyniki and wyniki.test_type != 'twarze' %}{{ wyniki.wynik_g|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
-                        <div id="blue">Niebieski: {% if wyniki and wyniki.test_type != 'twarze' %}{{ wyniki.wynik_b|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
-                        <div id="average">Średnia całkowita: {% if wyniki and wyniki.test_type != 'twarze' %}{{ wyniki.wynik_ogolny|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
-                        <div id="time">Czas badania: {% if wyniki and wyniki.test_type != 'twarze' %}{{ wyniki.czas_trwania|default:'00:00:00' }}{% else %}Brak wyników{% endif %}</div>
+                        <div id="red">Czerwony: {% if wyniki and wyniki.test_type != 'twarze' and wyniki.test_type != 'ishihara' %}{{ wyniki.wynik_r|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
+                        <div id="green">Zielony: {% if wyniki and wyniki.test_type != 'twarze' and wyniki.test_type != 'ishihara' %}{{ wyniki.wynik_g|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
+                        <div id="blue">Niebieski: {% if wyniki and wyniki.test_type != 'twarze' and wyniki.test_type != 'ishihara' %}{{ wyniki.wynik_b|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
+                        <div id="average">Średnia całkowita: {% if wyniki and wyniki.test_type != 'twarze' and wyniki.test_type != 'ishihara' %}{{ wyniki.wynik_ogolny|default:0 }}{% else %}Brak wyników{% endif %}<br><br></div>
+                        <div id="time">Czas badania: {% if wyniki and wyniki.test_type != 'twarze' and wyniki.test_type != 'ishihara' %}{{ wyniki.czas_trwania|default:'00:00:00' }}{% else %}Brak wyników{% endif %}</div>
                     </div>
                     <!-- Test twarzy -->
                     <div id="face_results" style="display:none;">
@@ -113,6 +114,10 @@
                         <div id="face_age">Osoby młode: - | Średni wiek: - | Podeszły wiek: -<br><br></div>
                         <div id="face_stages">Etap 1: - | Etap 2: - | Etap 3: - | Etap 4: - | Etap 5: -<br><br></div>
                         <div id="face_time">Czas badania: -</div>
+                    </div>
+                    <div id="ishihara_results" style="display:none; margin-top:10px;">
+                        <div id="ishihara_score">Prawidłowe odpowiedzi: – / {{ ishihara_trial_count }}</div><br>
+                        <div id="ishihara_time">Czas badania: –</div>
                     </div>
                 </div>
             </div>
@@ -257,37 +262,24 @@ function Wyb() {
 }
 function getSelectedTestType() {
     var testSelect = document.getElementById('testyy');
-    if (!testSelect) {
-        return null;
-    }
-    var selectedText = '';
-    try {
-        selectedText = testSelect.options[testSelect.selectedIndex].text.toLowerCase();
-    } catch (e) {
-        selectedText = testSelect.value.toLowerCase();
-    }
-    if (selectedText.includes('twar')) {
-        return 'twarze';
-    }
-    if (selectedText.includes('kolor')) {
-        return 'kolory';
-    }
-    return null;
+    return testSelect?.selectedOptions[0]?.dataset.testType || null;
 }
 
 function showResultContainersForTest(type) {
-    var colorContainer = document.getElementById('color_results');
-    var faceContainer = document.getElementById('face_results');
-    if (type === 'twarze') {
-        if (colorContainer) colorContainer.style.display = 'none';
-        if (faceContainer) faceContainer.style.display = 'block';
-    } else {
-        if (colorContainer) colorContainer.style.display = 'block';
-        if (faceContainer) faceContainer.style.display = 'none';
-    }
+    document.getElementById('color_results').style.display = type === 'twarze' || type === 'ishihara' ? 'none' : 'block';
+    document.getElementById('face_results').style.display = type === 'twarze' ? 'block' : 'none';
+    document.getElementById('ishihara_results').style.display = type === 'ishihara' ? 'block' : 'none';
 }
 
-function rozpocznijTest() {
+function showIshiharaResult(wynik, czas) {
+    var score = wynik == null ? '–' : Number(wynik);
+    document.getElementById('ishihara_score').textContent = 'Prawidłowe odpowiedzi: ' + score + ' / {{ ishihara_trial_count }}';
+    document.getElementById('ishihara_time').textContent = 'Czas badania: ' + (czas || '–');
+}
+
+let wyborPacjentaRequest;
+
+async function rozpocznijTest() {
     var pacjentSelect = document.getElementById("iinlist");
     var testSelect = document.getElementById("testyy");
 
@@ -306,6 +298,22 @@ function rozpocznijTest() {
         return;
     }
 
+    if (getSelectedTestType() === 'ishihara') {
+        var pacjentId = pacjentSelect.value;
+        try {
+            var response = await wyborPacjentaRequest;
+            if (response && !response.ok) {
+                throw new Error('Nie udało się zapisać wyboru pacjenta.');
+            }
+        } catch (error) {
+            alert('Nie udało się zapisać wyboru pacjenta. Wybierz pacjenta ponownie.');
+            return;
+        }
+        if (pacjentId !== pacjentSelect.value || testUrl !== testSelect.value) {
+            return;
+        }
+        testUrl += '?pacjent_id=' + encodeURIComponent(pacjentId);
+    }
     window.location.href = testUrl;
 }
 
@@ -405,20 +413,8 @@ function aktualizujWynikiWidocznosc() {
             wynikiDane.style.display = 'none';
         }
     } else {
-        // decide which result container to show based on selected test
         wynikiDane.style.display = 'block';
-        var optText = '';
-        try { optText = testSelect.options[testSelect.selectedIndex].text.toLowerCase(); } catch(e){}
-        var isFace = optText.includes('twar') || (testSelect.value && testSelect.value.indexOf('test2') !== -1);
-        var colorContainer = document.getElementById('color_results');
-        var faceContainer = document.getElementById('face_results');
-        if (isFace) {
-            if (colorContainer) colorContainer.style.display = 'none';
-            if (faceContainer) faceContainer.style.display = 'block';
-        } else {
-            if (colorContainer) colorContainer.style.display = 'block';
-            if (faceContainer) faceContainer.style.display = 'none';
-        }
+        showResultContainersForTest(getSelectedTestType());
     }
 }
 
@@ -437,12 +433,8 @@ function loadPendingTestResults() {
     try {
         var wyniki = JSON.parse(resultsJson);
         
-        // Sprawdzenie czy to test kolorów czy test twarzy
-        var colorContainer = document.getElementById('color_results');
-        var faceContainer = document.getElementById('face_results');
         function showColor(w) {
-            if (colorContainer) colorContainer.style.display = 'block';
-            if (faceContainer) faceContainer.style.display = 'none';
+            showResultContainersForTest('kolory');
             document.getElementById('test_kolorow').textContent = 'Wyniki zakończonego testu kolorów:';
             document.getElementById('red').innerHTML = `Czerwony: ${w.wynik_r}<br><br>`;
             document.getElementById('green').innerHTML = `Zielony: ${w.wynik_g}<br><br>`;
@@ -454,8 +446,7 @@ function loadPendingTestResults() {
             }
         }
         function showFace(w) {
-            if (colorContainer) colorContainer.style.display = 'none';
-            if (faceContainer) faceContainer.style.display = 'block';
+            showResultContainersForTest('twarze');
             document.getElementById('test_kolorow').textContent = 'Wyniki zakończonego testu twarzy:';
             document.getElementById('face_overall').innerHTML = `Prawidłowe odpowiedzi: ${w.wynik_ogolny || '-'} /30<br><br>`;
             document.getElementById('face_gender').innerHTML = `Mężczyźni: ${w.wynik_m || '-'} | Kobiety: ${w.wynik_k || '-'}<br><br>`;
@@ -467,7 +458,12 @@ function loadPendingTestResults() {
             }
         }
 
-        if (wyniki.wynik_r !== undefined) {
+        if (wyniki.test_type === 'ishihara') {
+            document.getElementById('testyy').value = '{% url "test_ishihara" %}';
+            showResultContainersForTest('ishihara');
+            document.getElementById('test_kolorow').textContent = 'Wyniki zakończonego testu Ishihary:';
+            showIshiharaResult(wyniki.wynik_ogolny, wyniki.czas);
+        } else if (wyniki.wynik_r !== undefined) {
             showColor(wyniki);
         } else if (wyniki.wynik_m !== undefined) {
             showFace(wyniki);
@@ -509,7 +505,12 @@ function skipWyniki() {
     document.getElementById('skip_wyniki_btn').style.display = 'none';
     document.getElementById('pending_results_message').style.display = 'none';
     setPendingInteractionLock(false);
-    aktualizujWynikiWidocznosc();
+    if (getSelectedTestType() === 'ishihara') {
+        document.getElementById('test_kolorow').textContent = '';
+        wybierzPacjenta();
+    } else {
+        aktualizujWynikiWidocznosc();
+    }
 }
 
 function zapisz() {
@@ -665,14 +666,15 @@ function wybierzPacjenta() {
 
     if (pacjentId != "0") {
         // AJAX do wyboru pacjenta
-        fetch('{% url "wybierz_pacjenta" %}', {
+        wyborPacjentaRequest = fetch('{% url "wybierz_pacjenta" %}', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'X-CSRFToken': getCookie('csrftoken')
             },
             body: 'pacjent_id=' + pacjentId
-        }).then(() => {
+        });
+        wyborPacjentaRequest.then(() => {
             // Pobierz dane pacjenta
             fetch(`/info/get_pacjent_data/${pacjentId}/`)
             .then(response => response.json())
@@ -691,6 +693,11 @@ function wybierzPacjenta() {
                 document.getElementById("info_wiek").innerHTML = `Wiek: ${data.wiek}`;
                 var selectedType = getSelectedTestType();
                 showResultContainersForTest(selectedType);
+                if (selectedType === 'ishihara') {
+                    var ishihara = data.ostatnie_badanie_ishihara;
+                    showIshiharaResult(ishihara?.wynik_ogolny, ishihara?.czas_trwania);
+                    return;
+                }
                 if (data.mial_badanie) {
                     var last = data.ostatnie_badanie;
                     if (selectedType === 'twarze') {
