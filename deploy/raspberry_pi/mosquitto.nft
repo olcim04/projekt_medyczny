@@ -1,0 +1,12 @@
+# Managed by projekt_medyczny MQTT setup
+# Replace only the project's table in one transaction.
+add table inet projekt_medyczny_mqtt
+flush table inet projekt_medyczny_mqtt
+table inet projekt_medyczny_mqtt {
+    chain input {
+        type filter hook input priority filter; policy accept;
+        iifname "lo" accept
+        iifname "@WIFI_IFACE@" ip saddr 10.42.0.0/24 ip daddr 10.42.0.1 tcp dport { 1883, 9001 } accept
+        tcp dport { 1883, 9001 } drop
+    }
+}
