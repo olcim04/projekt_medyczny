@@ -29,6 +29,7 @@
             <button onclick="wznówTest()" id="wznów_btn" style="background-color: #e0e0e0; border: none; color: #cbcbcb; display: none;">WZNÓW</button>
             <button type="button" class="btn-small" onclick="Powrot()">WRÓĆ</button>
         </div>
+        {% include "mqtt_status.html" %}
         <h1 id="title" style="color: #222222;">
             TEST TWARZY <br><br>
         </h1>
@@ -68,56 +69,17 @@
 <script>
 
 const FACE_IMAGE_BASE = "{% static 'testimg/' %}";
-let joystickMode = false;
-let joystickSelection = 2;
-
 function setupJoystickForFaceTest() {
-    if (!window.MQTTJoystick) {
-        return;
-    }
-
-    const controller = window.MQTTJoystick.init({
-        enabled: true,
-        host: window.MQTT_BROKER_HOST || window.location.hostname || 'localhost',
-        port: 9001,
-        path: '/mqtt',
-        topic: 'test/joystick',
-        username: '',
-        password: '',
-        reconnectTimeout: 5000,
-        simulateKeyboard: false,
-    }, function (value) {
-        if (value === undefined || value === null) return;
-
-        joystickMode = true;
-
-        if (value === -1) {
-            joystickSelection = Math.max(1, joystickSelection - 1);
-            Choice(joystickSelection);
-            return;
-        }
-
-        if (value === 1) {
-            joystickSelection = Math.min(3, joystickSelection + 1);
-            Choice(joystickSelection);
-            return;
-        }
-
-        if (value === 0) {
-            joystickSelection = 2;
-            Choice(joystickSelection);
-            return;
-        }
+    window.__faceJoystickController = window.MQTTJoystick?.init({ simulateKeyboard: false }, value => {
+        if (paused || stage >= 34) return;
 
         if (value === 2) {
-            Choice(joystickSelection);
-            if (typeof Change === 'function') {
-                Change();
-            }
+            document.getElementById('dal').click();
+        } else if (canChooseFace()) {
+            const current = choice || 2;
+            Choice(value === 0 ? 2 : Math.max(1, Math.min(3, current + value)));
         }
     });
-
-    window.__faceJoystickController = controller;
 }
 
 function Twarz(plec, wiek, set, images) {
@@ -134,6 +96,10 @@ let P = 0;
 let c = false;
 let choice = 0;
 let paused = false;
+let showingFace = false;
+let previewTimeout = null;
+let previewStartedAt = 0;
+let previewRemaining = 0;
 let ListaTwarzy = [];
 var [wynik_1,wynik_2,wynik_3,wynik_4,wynik_5,wynik_M,wynik_F,wynik_dzieci,wynik_sredni,wynik_starszy,wynik_ogolny] = [0,0,0,0,0,0,0,0,0,0,0];
 let Kolej;
@@ -156,8 +122,6 @@ function Setup(){
     choice = 0;
     c = false;
     progress = 0;
-    joystickMode = false;
-    joystickSelection = 2;
     const faceTrials = JSON.parse(document.getElementById('face-test-trials').textContent);
     const warmupTrials = JSON.parse(document.getElementById('face-test-warmup-trials').textContent);
     const warmupImages = warmupTrials[Random(0, warmupTrials.length - 1)];
@@ -178,7 +142,13 @@ function Setup(){
     setupJoystickForFaceTest();
 }
 
+function canChooseFace() {
+    return !paused && !showingFace && (stage === 2 || (stage >= 4 && stage <= 33));
+}
+
 function Choice(x) {
+        if (x !== 0 && (!canChooseFace() || ![1, 2, 3].includes(x))) return;
+
         // usuń zaznaczenie z wszystkich
         ['t1','t2','t3'].forEach(id => {
             const el = document.getElementById(id);
@@ -186,18 +156,20 @@ function Choice(x) {
         });
         if (x === 0) {
             choice = 0;
-            document.getElementById("dal").disabled = 1;
+            document.getElementById("dal").disabled = true;
             document.getElementById("dal").style.backgroundColor = "#e0e0e0";
             return;
         }
         choice = x;
         const sel = document.getElementById('t'+x);
         if (sel) sel.classList.add('selected');
-        document.getElementById("dal").disabled = 0;
+        document.getElementById("dal").disabled = false;
         document.getElementById("dal").style.backgroundColor = "#4b78a6";
 }
 
 function Change() {
+    if (paused || document.getElementById("dal").disabled || stage > 34) return;
+
     switch (stage) {
         case 0:
             document.getElementById("intro").innerHTML = `<h1> To jest rozgrzewka.<br><br>Za chwilę zobaczysz na ekranie twarz mężczyzny.<br><br>
@@ -217,11 +189,9 @@ function Change() {
             document.getElementById("dal").textContent = "DALEJ";
             document.getElementById("title").innerHTML = `A teraz zaznacz tę twarz, którą widziałeś(-aś) przed chwilą, po czym naciśnij przycisk DALEJ.`;
             document.getElementById("title").style.display = "none"
-            choice = 0;
             progress++;
             stage++;
-            choice = 0;
-            setTimeout(PostChange, 3000);
+            startFacePreview();
         break;
         case 2:
             document.getElementById("title").style.display = "none"
@@ -250,6 +220,7 @@ function Change() {
                 c = false;
                 stage++
             } else if (stage === 34) {
+                stage++;
                 SaveResults();
             }
         break;
@@ -264,8 +235,6 @@ function PreChange() {
         throw new Error("Brak kolejnej próby w teście twarzy.");
     }
     PrepareTrial(trial);
-    document.getElementById("dal").disabled = 1;
-    document.getElementById("dal").style.backgroundColor = "#e0e0e0";
     document.getElementById("ttall").innerHTML = `<img src="${FACE_IMAGE_BASE}${trial.previewImage}" alt="">`;
     document.getElementById("title").style.display = "none"
     document.getElementById("intro").style.display = "none";
@@ -273,14 +242,36 @@ function PreChange() {
     document.getElementById("test").style.display = "inline";
     document.getElementById("ttall").style.display = "block";
     progress++;
-    choice = 0;
-    setTimeout(PostChange, 3000);
+    startFacePreview();
+}
+
+function startFacePreview() {
+    showingFace = true;
+    Choice(0);
+    previewRemaining = 3000;
+    resumeFacePreview();
+}
+
+function resumeFacePreview() {
+    if (!showingFace || previewTimeout !== null) return;
+
+    previewStartedAt = performance.now();
+    previewTimeout = setTimeout(PostChange, previewRemaining);
+}
+
+function pauseFacePreview() {
+    if (previewTimeout === null) return;
+
+    clearTimeout(previewTimeout);
+    previewTimeout = null;
+    previewRemaining = Math.max(0, previewRemaining - (performance.now() - previewStartedAt));
 }
 
 function PostChange() {
+    previewTimeout = null;
+    showingFace = false;
     const trial = ListaTwarzy[progress - 1];
     setTimerRunning(!trial.warmup);
-    Choice(0);
     Triada();
     document.getElementById("dal").style.backgroundColor = "#4b78a6";
     document.getElementById("title").style.display = trial.warmup ? "inline" : "none";
@@ -404,6 +395,7 @@ function Powrot() {
 
 function stopTest() {
     freezeTimer();
+    pauseFacePreview();
     paused = true;
     document.getElementById("pauseOverlay").style.display = "flex";
     document.getElementById("paz").style.display = "none";
@@ -412,6 +404,7 @@ function stopTest() {
 
 function resumeTest() {
     paused = false;
+    resumeFacePreview();
     setTimerRunning(timerShouldRun);
     document.getElementById("pauseOverlay").style.display = "none";
     document.getElementById("paz").style.display = "inline";

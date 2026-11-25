@@ -86,7 +86,10 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y \
     libmariadb-dev \
     libmariadb-dev-compat \
     mariadb-server \
+    mosquitto \
+    mosquitto-clients \
     network-manager \
+    nftables \
     openssl \
     pkg-config \
     python3 \
@@ -113,6 +116,8 @@ if ! iw phy "$WIFI_PHY" info |
     grep -Eq '^[[:space:]]*\*[[:space:]]+AP([[:space:]]|$)'; then
     fail "Interfejs $WIFI_IFACE ($WIFI_PHY) nie zgłasza obsługi trybu AP."
 fi
+
+bash "$PROJECT_DIR/deploy/raspberry_pi/setup_mqtt.sh" --wifi-interface "$WIFI_IFACE" --broker-only
 
 VENV="$PROJECT_DIR/.venv"
 if [[ ! -x "$VENV/bin/python" ]]; then
@@ -170,7 +175,7 @@ run_project_python migrate --noinput
 run_project_python initialize_legacy_schema
 run_project_python collectstatic --noinput
 run_project_python check
-for asset in css/home.css js/mqtt-joystick.js testimg/1test.png; do
+for asset in css/home.css js/paho-mqtt.min.js js/mqtt-joystick.js testimg/1test.png; do
     [[ -s "$PROJECT_DIR/staticfiles/$asset" ]] ||
         fail "collectstatic nie wygenerował pliku $asset."
 done
@@ -242,6 +247,7 @@ if [[ -n "$PROFILE_UUID" ]]; then
         802-11-wireless.band bg \
         802-11-wireless.channel 6 \
         wifi-sec.key-mgmt wpa-psk \
+        wifi-sec.proto rsn \
         wifi-sec.psk "$WIFI_PASSWORD" \
         ipv4.method manual \
         ipv4.addresses 10.42.0.1/24 \
@@ -253,6 +259,7 @@ else
         802-11-wireless.band bg \
         802-11-wireless.channel 6 \
         wifi-sec.key-mgmt wpa-psk \
+        wifi-sec.proto rsn \
         wifi-sec.psk "$WIFI_PASSWORD" \
         ipv4.method manual \
         ipv4.addresses 10.42.0.1/24 \
@@ -314,4 +321,4 @@ nmcli connection up uuid "$PROFILE_UUID"
 printf '\nHotspot Wi-Fi jest skonfigurowany: SSID %s, adres 10.42.0.1/24.\n' "$SSID"
 printf 'DHCP przydziela adresy lokalnie; nie jest ogłaszana brama internetowa.\n'
 printf 'Aplikacja: http://10.42.0.1:8000\n'
-printf 'Usługi: sudo systemctl status projekt-medyczny mariadb dnsmasq\n'
+printf 'Usługi: sudo systemctl status projekt-medyczny mariadb dnsmasq mosquitto\n'

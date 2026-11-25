@@ -1,6 +1,7 @@
 # Python
 venv/
 .venv/
+.venv-esp32/
 __pycache__/
 *.py[cod]
 
